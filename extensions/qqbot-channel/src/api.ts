@@ -54,11 +54,17 @@ export class QQBotApiClient {
     const res = await fetch(url, { headers });
 
     if (!res.ok) {
-      throw new Error(`Failed to get gateway URL: ${res.status} ${res.statusText}`);
+      const body = await res.text().catch(() => "");
+      throw new Error(`Failed to get gateway URL: ${res.status} ${body}`);
     }
 
     const data = (await res.json()) as { url: string };
     return data.url;
+  }
+
+  clearToken(): void {
+    this.accessToken = null;
+    this.tokenExpiresAt = 0;
   }
 
   async sendC2CMessage(openid: string, body: SendMessageBody): Promise<void> {

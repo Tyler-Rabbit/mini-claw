@@ -269,7 +269,10 @@ export class QQBotGateway {
     } else if (code === 4014) {
       this.logger.error("[qqbot] Bot has been shut down or banned");
     } else if (code >= 4900 && code <= 4913) {
-      this.logger.error("[qqbot] Internal error from QQ gateway, will reconnect...");
+      // 4902 = "reset by resume" — session is invalid, must re-identify
+      this.logger.warn("[qqbot] QQ gateway internal error, clearing session and will re-identify");
+      this.sessionId = null;
+      this.lastSeq = null;
     }
 
     if (!this.destroyed) {
@@ -301,6 +304,8 @@ export class QQBotGateway {
         if (!this.apiClient) {
           this.apiClient = new QQBotApiClient(this.config);
         }
+        // Force fresh token on reconnect
+        this.apiClient.clearToken();
         this.gatewayUrl = await this.apiClient.getGatewayUrl();
         this.connect(this.gatewayUrl);
       } catch (err) {

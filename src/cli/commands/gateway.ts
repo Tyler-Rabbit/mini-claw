@@ -81,6 +81,30 @@ export function addGatewayCommand(program: Command): void {
                   payload: { runId: requestId, text: event.content, done: false },
                 });
               }
+              if (event.type === "tool_use") {
+                ctx.send({
+                  type: "event",
+                  event: "agent:tool_use",
+                  payload: {
+                    runId: requestId,
+                    toolName: event.toolName,
+                    toolArgs: event.toolArgs,
+                    toolCallId: event.toolCallId,
+                  },
+                });
+              }
+              if (event.type === "tool_result") {
+                ctx.send({
+                  type: "event",
+                  event: "agent:tool_result",
+                  payload: {
+                    runId: requestId,
+                    toolName: event.toolName,
+                    toolResult: event.toolResult,
+                    toolCallId: event.toolCallId,
+                  },
+                });
+              }
               if (event.type === "done") {
                 ctx.send({
                   type: "event",

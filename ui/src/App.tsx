@@ -7,7 +7,10 @@ import { ChatInput } from './components/ChatInput'
 const WS_URL = `ws://${window.location.hostname}:18789`
 
 export default function App() {
-  const { connected, connecting, connect, disconnect, sendMessage, streamingText, isStreaming } = useGateway(WS_URL)
+  const {
+    connected, connecting, connect, disconnect, sendMessage,
+    streamingText, isStreaming, streamingToolCalls,
+  } = useGateway(WS_URL)
   const [messages, setMessages] = useState<Message[]>([])
   const listRef = useRef<HTMLDivElement>(null)
   const msgIdRef = useRef(0)
@@ -16,13 +19,14 @@ export default function App() {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight
     }
-  }, [messages, streamingText])
+  }, [messages, streamingText, streamingToolCalls])
 
   const handleSend = (text: string) => {
     const userMsg: Message = {
       id: String(++msgIdRef.current),
       role: 'user',
       content: text,
+      toolCalls: [],
       timestamp: Date.now(),
     }
     setMessages(prev => [...prev, userMsg])
@@ -31,20 +35,24 @@ export default function App() {
 
   // When streaming finishes, add the assistant message
   useEffect(() => {
-    if (!isStreaming && streamingText) {
+    if (!isStreaming && (streamingText || streamingToolCalls.length > 0)) {
       setMessages(prev => {
-        // Avoid duplicates: only add if the last assistant message differs
         const last = prev[prev.length - 1]
-        if (last?.role === 'assistant' && last.content === streamingText) return prev
+        if (
+          last?.role === 'assistant' &&
+          last.content === streamingText &&
+          last.toolCalls === streamingToolCalls
+        ) return prev
         return [...prev, {
           id: String(++msgIdRef.current),
           role: 'assistant' as const,
           content: streamingText,
+          toolCalls: streamingToolCalls,
           timestamp: Date.now(),
         }]
       })
     }
-  }, [isStreaming, streamingText])
+  }, [isStreaming, streamingText, streamingToolCalls])
 
   return (
     <div className="app">
@@ -70,6 +78,22 @@ export default function App() {
         {isStreaming && (
           <div className="message message-assistant">
             <div className="message-role">Agent</div>
+            {streamingToolCalls.length > 0 && (
+              <div className="tool-calls">
+                {streamingToolCalls.map(tool => (
+                  <div
+                    key={tool.toolCallId}
+                    className={`tool-call ${tool.status === 'running' ? 'tool-call-running' : 'tool-call-done'}`}
+                  >
+                    <div className="tool-call-header">
+                      <span className="tool-call-icon">{tool.status === 'running' ? '⟳' : '✓'}</span>
+                      <span className="tool-call-name">{tool.toolName}</span>
+                      {tool.status === 'running' && <span className="tool-call-spinner" />}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="message-content">
               {streamingText}
               <span className="cursor" />

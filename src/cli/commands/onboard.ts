@@ -56,6 +56,14 @@ export function addOnboardCommand(program: Command): void {
         hint: p.builtin ? "built-in" : "plugin",
       }));
 
+      if (providerOptions.length === 0) {
+        // Fallback when no providers are discovered (e.g. path issues)
+        providerOptions.push(
+          { value: "claude", label: "Claude", hint: "built-in" },
+          { value: "openai", label: "OpenAI", hint: "built-in" },
+        );
+      }
+
       if (providerOptions.length > 2) {
         providerOptions.push({
           value: "all",

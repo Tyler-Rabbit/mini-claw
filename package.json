@@ -1,6 +1,6 @@
 {
   "name": "@tylerge99/mini-claw",
-  "version": "0.3.0",
+  "version": "0.7.0",
   "description": "A mini AI assistant system inspired by OpenClaw architecture",
   "type": "module",
   "main": "dist/index.js",

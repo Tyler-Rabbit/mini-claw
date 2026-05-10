@@ -1,4 +1,5 @@
 import type { Readable } from "node:stream";
+import { execFileSync } from "node:child_process";
 
 // Matches common ANSI escape sequences (CSI, OSC, etc.)
 const ANSI_REGEX =
@@ -43,6 +44,53 @@ export function truncateOutput(
   return { text: head + marker + tail, truncated: true };
 }
 
+// --- Windows encoding detection ---
+
+let cachedCodePage: string | null = null;
+
+/**
+ * Get the system OEM code page encoding label for TextDecoder.
+ * On Windows, child process pipes use the OEM code page (e.g. GBK/CP936 for Chinese).
+ * Cached after first call since the code page doesn't change during a session.
+ */
+function getStreamEncoding(): string {
+  if (process.platform !== "win32") return "utf-8";
+
+  if (cachedCodePage !== null) return cachedCodePage;
+
+  try {
+    // chcp returns: "Active code page: 65001" or "活动代码页: 936"
+    const out = execFileSync("chcp", [], {
+      encoding: "utf-8",
+      timeout: 3000,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const match = out.match(/(\d+)\s*$/);
+    if (match) {
+      const cp = match[1];
+      // Map common Windows code pages to TextDecoder labels
+      const cpMap: Record<string, string> = {
+        "65001": "utf-8",
+        "936": "gbk",
+        "950": "big5",
+        "932": "shift-jis",
+        "949": "euc-kr",
+        "1252": "windows-1252",
+        "1251": "windows-1251",
+        "866": "ibm866",
+        "850": "cp850",
+      };
+      cachedCodePage = cpMap[cp] ?? "utf-8";
+    } else {
+      cachedCodePage = "utf-8";
+    }
+  } catch {
+    cachedCodePage = "utf-8";
+  }
+
+  return cachedCodePage;
+}
+
 export interface CollectedOutput {
   data: string;
   truncated: boolean;
@@ -51,6 +99,7 @@ export interface CollectedOutput {
 /**
  * Collect data from a readable stream into a string with a byte cap.
  * Streams that exceed the cap are truncated mid-stream to avoid OOM.
+ * Handles Windows encoding (OEM code page) automatically.
  */
 export function collectStream(
   stream: Readable,
@@ -80,9 +129,11 @@ export function collectStream(
 
     const onEnd = () => {
       cleanup();
-      const raw = Buffer.concat(chunks).toString("utf-8");
+      const raw = Buffer.concat(chunks);
+      const encoding = getStreamEncoding();
+      const decoded = new TextDecoder(encoding).decode(raw);
       resolve({
-        data: normalizeNewlines(stripAnsi(raw)),
+        data: normalizeNewlines(stripAnsi(decoded)),
         truncated,
       });
     };

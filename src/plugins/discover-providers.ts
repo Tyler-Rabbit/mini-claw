@@ -1,11 +1,15 @@
 import { readdir, readFile } from "node:fs/promises";
-import { join, resolve, dirname } from "node:path";
+import { join, resolve, dirname, isAbsolute } from "node:path";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 // Package root: dist/plugins/ -> dist/ -> root
-const packageRoot = resolve(dirname(new URL(import.meta.url).pathname), "../..");
+const packageRoot = resolve(__dirname, "../..");
 
 export interface DiscoveredProvider {
   pluginId: string;
@@ -26,10 +30,7 @@ export async function discoverProviders(
   const providers: DiscoveredProvider[] = [];
 
   // 1. Built-in providers (statically known)
-  const builtinDir = join(
-    new URL(".", import.meta.url).pathname,
-    "builtins"
-  );
+  const builtinDir = join(__dirname, "builtins");
   await scanDir(builtinDir, providers, true);
 
   // 2. Bundled extensions (shipped with the package)
@@ -40,11 +41,11 @@ export async function discoverProviders(
 
   // 3. User-configured plugin directories
   for (const loadPath of loadPaths) {
-    const absPath = basePath && !loadPath.startsWith("/")
+    const absPath = basePath && !isAbsolute(loadPath)
       ? resolve(basePath, loadPath)
       : resolve(loadPath);
     // Skip if same as bundled dir (avoid duplicates)
-    if (absPath === bundledExtDir) continue;
+    if (absPath.toLowerCase() === bundledExtDir.toLowerCase()) continue;
     await scanDir(absPath, providers, false);
   }
 

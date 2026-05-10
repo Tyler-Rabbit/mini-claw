@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import type { ExecuteResult, BashToolParams } from "./types.js";
 import { collectStream, truncateOutput, stripAnsi, normalizeNewlines } from "./output.js";
@@ -7,11 +7,18 @@ import { processRegistry } from "./process-registry.js";
 // --- Security: command blacklist ---
 
 const BLACKLIST_PATTERNS: RegExp[] = [
+  // Unix
   /^rm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+)?\/(\s|$)/, // rm -rf /
   /:\(\)\{.*\|.*\&.*\}/, // fork bomb
   /mkfs\./, // format disk
   /dd\s+.*of=\/dev\//, // dd to device
   />\s*\/dev\/sd/, // write to disk device
+  // Windows
+  /rmdir\s+\/[sS]\s+\/[qQ]\s+[A-Za-z]:\\/, // rmdir /s /q C:\
+  /Remove-Item\s+.*-Recurse\s+.*-Force\s+[A-Za-z]:\\/, // Remove-Item -Recurse -Force C:\
+  /format\s+[A-Za-z]:/, // format C:
+  /diskpart/i, // diskpart
+  /Remove-Item\s+.*-Recurse\s+.*\\$/, // Remove-Item -Recurse C:\
 ];
 
 function checkBlacklist(command: string): string | null {
@@ -44,13 +51,37 @@ function sanitizeEnv(
 
 // --- Shell resolution ---
 
-function resolveShell(): { cmd: string; arg: string } {
+interface ShellInfo {
+  cmd: string;
+  arg: string;
+  isPowerShell: boolean;
+}
+
+function resolveShell(): ShellInfo {
   if (process.platform === "win32") {
     const pwsh = process.env.POWERSHELL_PATH ?? "pwsh.exe";
-    return { cmd: pwsh, arg: "-Command" };
+    // Fall back to cmd.exe if PowerShell Core is not available
+    const check = spawnSync(pwsh, ["-Version"], { stdio: "ignore", timeout: 3000 });
+    if (check.error) {
+      return { cmd: "cmd.exe", arg: "/c", isPowerShell: false };
+    }
+    return { cmd: pwsh, arg: "-Command", isPowerShell: true };
   }
   const shell = process.env.SHELL ?? "/bin/bash";
-  return { cmd: shell, arg: "-c" };
+  return { cmd: shell, arg: "-c", isPowerShell: false };
+}
+
+/**
+ * Wrap a command to normalize encoding on Windows.
+ * PowerShell defaults to UTF-16LE in pipes — $OutputEncoding fixes most cmdlets.
+ * cmd.exe uses OEM code page — TextDecoder in output.ts handles the decoding.
+ */
+function wrapWithEncoding(command: string, shell: ShellInfo): string {
+  if (process.platform !== "win32") return command;
+  if (shell.isPowerShell) {
+    return `$OutputEncoding = [System.Text.Encoding]::UTF8; ${command}`;
+  }
+  return command;
 }
 
 // --- Working directory management ---
@@ -58,10 +89,15 @@ function resolveShell(): { cmd: string; arg: string } {
 const projectRoot = path.resolve(process.cwd());
 let currentDir = projectRoot;
 
+function isWithinProjectRoot(target: string): boolean {
+  const rel = path.relative(projectRoot, target);
+  return !rel.startsWith("..") && !path.isAbsolute(rel);
+}
+
 function resolveCwd(cwd?: string): string {
   if (!cwd) return currentDir;
   const resolved = path.resolve(currentDir, cwd);
-  if (!resolved.startsWith(projectRoot)) {
+  if (!isWithinProjectRoot(resolved)) {
     throw new Error(
       `Working directory must be within the project root`,
     );
@@ -101,7 +137,7 @@ export async function executeCommand(
   if (cdMatch) {
     const target = cdMatch[1].replace(/^["']|["']$/g, "");
     const resolved = path.resolve(currentDir, target);
-    if (!resolved.startsWith(projectRoot)) {
+    if (!isWithinProjectRoot(resolved)) {
       return {
         stdout: "",
         stderr: "cd target must be within the project root",
@@ -122,14 +158,15 @@ export async function executeCommand(
 
   const cwd = resolveCwd(params.cwd);
   const timeoutMs = params.timeout ?? DEFAULT_TIMEOUT_MS;
-  const { cmd: shell, arg: shellArg } = resolveShell();
+  const shell = resolveShell();
   const env = sanitizeEnv();
+  const wrappedCommand = wrapWithEncoding(command, shell);
 
   const start = Date.now();
 
   // Background mode
   if (params.background) {
-    const proc = spawn(shell, [shellArg, command], {
+    const proc = spawn(shell.cmd, [shell.arg, wrappedCommand], {
       cwd,
       env,
       stdio: ["pipe", "pipe", "pipe"],
@@ -147,7 +184,7 @@ export async function executeCommand(
 
   // Foreground mode
   return new Promise<ExecuteResult>((resolve) => {
-    const proc = spawn(shell, [shellArg, command], {
+    const proc = spawn(shell.cmd, [shell.arg, wrappedCommand], {
       cwd,
       env,
       stdio: ["pipe", "pipe", "pipe"],

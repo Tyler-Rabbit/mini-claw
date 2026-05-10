@@ -1,5 +1,6 @@
 import { readdir, stat, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import type { LoadedPlugin, PluginManifest, PluginRegisterFn } from "./types.js";
 
 export async function loadPluginsFromDir(dir: string): Promise<LoadedPlugin[]> {
@@ -41,7 +42,9 @@ export async function loadPluginsFromDir(dir: string): Promise<LoadedPlugin[]> {
     let register: PluginRegisterFn;
     try {
       // Try .ts first (for tsx), then .js
-      const mod = await import(entryFile).catch(() => import(entryEsm));
+      const mod = await import(pathToFileURL(entryFile).href).catch(() =>
+        import(pathToFileURL(entryEsm).href)
+      );
       register = mod.default ?? mod.register;
       if (typeof register !== "function") {
         console.warn(`[loader] ${entryPath} does not export a register function`);

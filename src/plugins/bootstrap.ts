@@ -1,4 +1,5 @@
 import { join, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { MiniClawConfig } from "../config/config.js";
 import type { ModelProvider, AgentTool } from "../agent/types.js";
 import type { ChannelPlugin } from "../channels/types.js";
@@ -7,7 +8,7 @@ import { loadPluginsFromDir } from "./loader.js";
 import { loadBuiltinPlugins } from "./builtins/index.js";
 
 // Package root: dist/plugins/ -> dist/ -> root
-const packageRoot = resolve(dirname(new URL(import.meta.url).pathname), "../..");
+const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const bundledExtDir = join(packageRoot, "extensions");
 
 export interface BootstrapResult {

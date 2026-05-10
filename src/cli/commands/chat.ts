@@ -1,0 +1,53 @@
+import { Command } from "commander";
+import { loadConfig } from "../../config/config.js";
+import { AgentRuntime } from "../../agent/runtime.js";
+import { ModelRouter } from "../../agent/model-router.js";
+import { ToolRegistry } from "../../agent/tool-registry.js";
+import { builtinTools } from "../../agent/tools/index.js";
+import { SessionManager } from "../../sessions/manager.js";
+import { bootstrapPlugins } from "../../plugins/bootstrap.js";
+import { runTuiChat } from "../tui-chat.js";
+
+export function addChatCommand(program: Command): void {
+  program
+    .command("chat")
+    .description("Start an interactive chat session")
+    .option("-c, --config <path>", "Config file path")
+    .option("-p, --provider <provider>", "Model provider name")
+    .option("-m, --model <model>", "Model to use")
+    .action(async (options) => {
+      const config = await loadConfig(options.config);
+      const provider = options.provider ?? config.agent.defaultProvider;
+      const model = options.model ?? config.agent.defaultModel;
+
+      // Bootstrap plugins
+      const { providers, tools: pluginTools } = await bootstrapPlugins(config);
+
+      // Setup model router
+      const modelRouter = new ModelRouter(provider);
+      for (const p of providers) {
+        modelRouter.registerProvider(p);
+      }
+
+      // Setup tools
+      const toolRegistry = new ToolRegistry();
+      for (const tool of builtinTools) toolRegistry.register(tool);
+      for (const tool of pluginTools) toolRegistry.register(tool);
+
+      // Setup sessions
+      const sessionManager = new SessionManager();
+
+      // Setup agent
+      const agent = new AgentRuntime({
+        modelRouter,
+        toolRegistry,
+        sessionManager,
+        maxToolRounds: config.agent.maxToolRounds,
+        defaultProvider: provider,
+        defaultModel: model,
+      });
+
+      // Launch TUI chat
+      await runTuiChat({ agent, provider, model });
+    });
+}

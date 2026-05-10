@@ -1,0 +1,8 @@
+{
+  "id": "xiaomi-provider",
+  "name": "Xiaomi MiMo",
+  "version": "1.0.0",
+  "description": "Xiaomi MiMo model provider (OpenAI/Anthropic compatible)",
+  "type": "provider",
+  "providerId": "xiaomi"
+}

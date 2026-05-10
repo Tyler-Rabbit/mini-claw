@@ -1,0 +1,31 @@
+const LOGO = [
+  " ███╗   ███╗██╗███╗   ██╗██╗ ██████╗ ██╗      █████╗ ██╗    ██╗",
+  " ████╗ ████║██║████╗  ██║██║██╔════╝██║     ██╔══██╗██║    ██║",
+  " ██╔████╔██║██║██╔██╗ ██║██║██║     ██║     ███████║██║ █╗ ██║",
+  " ██║╚██╔╝██║██║██║╚██╗██║██║██║     ██║     ██╔══██║██║███╗██║",
+  " ██║ ╚═╝ ██║██║██║ ╚████║██║ █████╗ ███████╗██║  ██║╚███╔███╔╝",
+  " ╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝ ╚════╝ ╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝",
+];
+
+/** Get banner lines formatted with ANSI colors for TUI rendering. */
+export function getBannerLines(version: string): string[] {
+  const lines: string[] = [];
+  for (let i = 0; i < LOGO.length; i++) {
+    if (i === LOGO.length - 1) {
+      lines.push(`\x1b[36m${LOGO[i]}\x1b[0m \x1b[90mv${version}\x1b[0m`);
+    } else {
+      lines.push(`\x1b[36m${LOGO[i]}\x1b[0m`);
+    }
+  }
+  return lines;
+}
+
+export function printBanner(version: string): void {
+  if (!process.stdout.isTTY) return;
+
+  console.log();
+  for (const line of getBannerLines(version)) {
+    console.log(line);
+  }
+  console.log();
+}

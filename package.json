@@ -1,0 +1,62 @@
+{
+  "name": "@tylerge99/mini-claw",
+  "version": "0.3.0",
+  "description": "A mini AI assistant system inspired by OpenClaw architecture",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "mini-claw": "dist/cli/program.js"
+  },
+  "scripts": {
+    "build": "tsc && cp -r src/plugins/builtins/claude-provider/mini-claw.plugin.json dist/plugins/builtins/claude-provider/ && cp -r src/plugins/builtins/openai-provider/mini-claw.plugin.json dist/plugins/builtins/openai-provider/",
+    "dev": "MINI_CLAW_ENV=dev tsx src/cli/program.ts chat",
+    "dev:onboard": "MINI_CLAW_ENV=dev tsx src/cli/program.ts onboard",
+    "gateway": "tsx src/cli/program.ts gateway",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "pnpm build",
+    "ui": "pnpm --filter mini-claw-ui dev",
+    "ui:build": "pnpm --filter mini-claw-ui build"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "ai",
+    "assistant",
+    "agent",
+    "multi-channel"
+  ],
+  "files": [
+    "dist",
+    "extensions",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "koffi"
+    ]
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@clack/prompts": "^1.3.0",
+    "@earendil-works/pi-tui": "^0.74.0",
+    "@sinclair/typebox": "^0.34.0",
+    "chalk": "^5.6.2",
+    "commander": "^13.1.0",
+    "openai": "^4.85.0",
+    "tsx": "^4.19.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "@types/ws": "^8.5.14",
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.0"
+  },
+  "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319"
+}

@@ -1,0 +1,9 @@
+{
+  "id": "builtin:claude",
+  "name": "Claude (Anthropic)",
+  "version": "1.0.0",
+  "description": "Built-in Claude model provider",
+  "builtin": true,
+  "type": "provider",
+  "providerId": "claude"
+}

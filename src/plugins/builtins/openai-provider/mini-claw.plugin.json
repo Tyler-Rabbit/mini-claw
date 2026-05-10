@@ -1,0 +1,9 @@
+{
+  "id": "builtin:openai",
+  "name": "OpenAI",
+  "version": "1.0.0",
+  "description": "Built-in OpenAI model provider",
+  "builtin": true,
+  "type": "provider",
+  "providerId": "openai"
+}

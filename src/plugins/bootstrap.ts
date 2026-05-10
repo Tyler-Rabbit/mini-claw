@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 import type { MiniClawConfig } from "../config/config.js";
 import type { ModelProvider, AgentTool } from "../agent/types.js";
 import type { ChannelPlugin } from "../channels/types.js";
+import type { SearchProvider } from "../agent/search-provider.js";
+import { searchProviderRegistry } from "../agent/search-provider-registry.js";
 import { PluginRegistry } from "./registry.js";
 import { loadPluginsFromDir } from "./loader.js";
 import { loadBuiltinPlugins } from "./builtins/index.js";
@@ -15,6 +17,7 @@ export interface BootstrapResult {
   providers: ModelProvider[];
   tools: AgentTool[];
   channels: ChannelPlugin[];
+  searchProviders: SearchProvider[];
   registry: PluginRegistry;
 }
 
@@ -65,10 +68,18 @@ export async function bootstrapPlugins(config: MiniClawConfig): Promise<Bootstra
   // 4. Initialize all plugins
   registry.initAll(pluginConfigs);
 
+  const searchProviders = registry.getSearchProviders();
+
+  // Register search providers into the global singleton for tool access
+  for (const sp of searchProviders) {
+    searchProviderRegistry.register(sp);
+  }
+
   return {
     providers: registry.getProviders(),
     tools: registry.getTools(),
     channels: registry.getChannels(),
+    searchProviders,
     registry,
   };
 }

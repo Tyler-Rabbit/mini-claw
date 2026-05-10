@@ -224,6 +224,18 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
             totalInputTokens = event.usage.inputTokens;
             totalOutputTokens = event.usage.outputTokens;
           }
+          if (event.type === "error" && event.content) {
+            // Remove loader and show error message
+            if (root.children.includes(loader)) {
+              stopProgressTimer();
+              loader.stop();
+              root.removeChild(loader);
+            }
+            chatContainer.addChild(
+              new Text(chalk.yellow("  [!] ") + event.content, 0, 0)
+            );
+            tui.requestRender();
+          }
           if (event.type === "done") {
             stopProgressTimer();
             loader.stop();

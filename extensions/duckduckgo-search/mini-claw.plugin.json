@@ -1,0 +1,7 @@
+{
+  "id": "duckduckgo-search",
+  "name": "DuckDuckGo Search",
+  "version": "1.0.0",
+  "description": "Web search provider using DuckDuckGo (no API key required)",
+  "type": "search"
+}

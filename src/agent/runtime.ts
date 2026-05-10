@@ -1,8 +1,6 @@
 import type {
   AgentRunOptions,
-  AgentStreamEvent,
   ModelMessage,
-  ModelToolCall,
   StreamCallback,
   TokenUsage,
 } from "./types.js";
@@ -152,15 +150,43 @@ export class AgentRuntime {
       }
     }
 
-    // Max rounds exceeded
-    const fallback = "I've reached the maximum number of tool execution rounds.";
-    onEvent?.({ type: "error", content: fallback });
+    // Max rounds exceeded — do a final model call without tools so it can summarize
+    const finalMessages: ModelMessage[] = [
+      ...messages,
+      {
+        role: "user",
+        content:
+          "You have reached the tool execution limit. Do NOT attempt to call any tools. Based on the information gathered so far, provide your best response to the user's original question using plain text only.",
+      },
+    ];
+
+    const finalResponse = await this.modelRouter.chat({
+      messages: finalMessages,
+      // No tools — forces a text response
+      model: model || this.defaultModel || undefined,
+      provider: this.defaultProvider,
+      stream: true,
+      onChunk: (text) => {
+        onEvent?.({ type: "text", content: text });
+      },
+    });
+
+    addUsage(finalResponse.usage);
+
+    const assistantMsg: ModelMessage = {
+      role: "assistant",
+      content: finalResponse.content,
+    };
+    messages.push(assistantMsg);
+    session.history.push(assistantMsg);
+
+    onEvent?.({ type: "usage", usage: totalUsage });
     onEvent?.({
       type: "done",
       usage: totalUsage,
       durationMs: Date.now() - startTime,
     });
-    return fallback;
+    return finalResponse.content;
   }
 
   async runSimple(message: string, sessionKey: string): Promise<string> {

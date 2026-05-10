@@ -1,0 +1,7 @@
+{
+  "id": "qqbot-channel",
+  "name": "QQ Bot Channel",
+  "version": "1.0.0",
+  "description": "QQ Bot channel plugin supporting C2C and group @mention messages",
+  "type": "channel"
+}

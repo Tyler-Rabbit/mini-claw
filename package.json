@@ -11,7 +11,7 @@
     "build": "tsc && cp -r src/plugins/builtins/claude-provider/mini-claw.plugin.json dist/plugins/builtins/claude-provider/ && cp -r src/plugins/builtins/openai-provider/mini-claw.plugin.json dist/plugins/builtins/openai-provider/",
     "dev": "MINI_CLAW_ENV=dev tsx src/cli/program.ts chat",
     "dev:onboard": "MINI_CLAW_ENV=dev tsx src/cli/program.ts onboard",
-    "gateway": "tsx src/cli/program.ts gateway",
+    "gateway": "MINI_CLAW_ENV=dev tsx src/cli/program.ts gateway",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",

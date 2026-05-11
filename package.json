@@ -9,9 +9,9 @@
   },
   "scripts": {
     "build": "tsc && cp -r src/plugins/builtins/claude-provider/mini-claw.plugin.json dist/plugins/builtins/claude-provider/ && cp -r src/plugins/builtins/openai-provider/mini-claw.plugin.json dist/plugins/builtins/openai-provider/",
-    "dev": "MINI_CLAW_ENV=dev tsx src/cli/program.ts chat",
-    "dev:onboard": "MINI_CLAW_ENV=dev tsx src/cli/program.ts onboard",
-    "gateway": "MINI_CLAW_ENV=dev tsx src/cli/program.ts gateway",
+    "dev": "cross-env MINI_CLAW_ENV=dev tsx src/cli/program.ts chat",
+    "dev:onboard": "cross-env MINI_CLAW_ENV=dev tsx src/cli/program.ts onboard",
+    "gateway": "cross-env MINI_CLAW_ENV=dev tsx src/cli/program.ts gateway",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
@@ -60,6 +60,7 @@
     "@types/node": "^22.13.0",
     "@types/turndown": "^5.0.6",
     "@types/ws": "^8.5.14",
+    "cross-env": "^10.1.0",
     "typescript": "^5.7.0",
     "vitest": "^3.2.0"
   },

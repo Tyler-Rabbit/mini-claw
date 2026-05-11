@@ -29,7 +29,7 @@ export class AgentRuntime {
     this.modelRouter = options.modelRouter;
     this.toolRegistry = options.toolRegistry;
     this.sessionManager = options.sessionManager;
-    this.maxToolRounds = options.maxToolRounds ?? 5;
+    this.maxToolRounds = options.maxToolRounds ?? 20;
     this.defaultProvider = options.defaultProvider ?? "claude";
     this.defaultModel = options.defaultModel ?? "";
   }

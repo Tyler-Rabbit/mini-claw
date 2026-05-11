@@ -5,7 +5,9 @@ import { ModelRouter } from "../../agent/model-router.js";
 import { ToolRegistry } from "../../agent/tool-registry.js";
 import { builtinTools } from "../../agent/tools/index.js";
 import { SessionManager } from "../../sessions/manager.js";
+import { SessionStore } from "../../sessions/store.js";
 import { bootstrapPlugins } from "../../plugins/bootstrap.js";
+import { getSessionsDir } from "../../config/paths.js";
 import { runTuiChat } from "../tui-chat.js";
 
 export function addChatCommand(program: Command): void {
@@ -35,7 +37,9 @@ export function addChatCommand(program: Command): void {
       for (const tool of pluginTools) toolRegistry.register(tool);
 
       // Setup sessions
-      const sessionManager = new SessionManager();
+      const sessionStore = new SessionStore(getSessionsDir());
+      await sessionStore.init();
+      const sessionManager = new SessionManager(sessionStore);
 
       // Setup agent
       const agent = new AgentRuntime({

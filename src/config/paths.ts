@@ -12,6 +12,10 @@ export function getConfigFilePath(): string {
   return join(getConfigDir(), "mini-claw.json");
 }
 
+export function getSessionsDir(): string {
+  return join(getConfigDir(), "sessions");
+}
+
 export async function ensureConfigDir(): Promise<void> {
   await mkdir(getConfigDir(), { recursive: true });
 }

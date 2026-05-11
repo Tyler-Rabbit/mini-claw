@@ -23,6 +23,7 @@ export * from "./channels/types.js";
 
 // Sessions
 export { SessionManager } from "./sessions/manager.js";
+export { SessionStore } from "./sessions/store.js";
 
 // Plugins
 export { PluginRegistry } from "./plugins/registry.js";

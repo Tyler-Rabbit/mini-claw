@@ -48,14 +48,16 @@ export class AgentRuntime {
     } = options;
 
     // Get or create session history
-    const session = this.sessionManager.getOrCreate(sessionKey);
+    const session = await this.sessionManager.getOrCreate(sessionKey);
     const messages: ModelMessage[] = [
       ...(history ?? session.history),
       { role: "user", content: message },
     ];
 
     // Save user message
-    session.history.push({ role: "user", content: message });
+    const userMsg: ModelMessage = { role: "user", content: message };
+    session.history.push(userMsg);
+    await this.sessionManager.persist(sessionKey, userMsg, channel);
 
     const tools = this.toolRegistry.toModelDefinitions();
     let round = 0;
@@ -100,6 +102,7 @@ export class AgentRuntime {
         };
         messages.push(assistantMsg);
         session.history.push(assistantMsg);
+        await this.sessionManager.persist(sessionKey, assistantMsg);
 
         onEvent?.({
           type: "done",
@@ -117,6 +120,7 @@ export class AgentRuntime {
       };
       messages.push(assistantMsg);
       session.history.push(assistantMsg);
+      await this.sessionManager.persist(sessionKey, assistantMsg);
 
       // Execute each tool and add results
       for (const toolCall of response.toolCalls) {
@@ -147,6 +151,7 @@ export class AgentRuntime {
         };
         messages.push(toolMsg);
         session.history.push(toolMsg);
+        await this.sessionManager.persist(sessionKey, toolMsg);
       }
     }
 
@@ -179,6 +184,7 @@ export class AgentRuntime {
     };
     messages.push(assistantMsg);
     session.history.push(assistantMsg);
+    await this.sessionManager.persist(sessionKey, assistantMsg);
 
     onEvent?.({ type: "usage", usage: totalUsage });
     onEvent?.({

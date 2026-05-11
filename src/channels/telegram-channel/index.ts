@@ -48,7 +48,7 @@ export class TelegramChannel implements ChannelPlugin {
       senderId: userId,
       senderName: userName,
       channel: "telegram",
-      sessionKey: `telegram/${chatId}`,
+      sessionKey: `agent:main:telegram:${chatId}`,
       timestamp: new Date(),
     });
 

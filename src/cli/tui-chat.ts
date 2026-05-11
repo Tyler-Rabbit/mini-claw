@@ -42,7 +42,7 @@ export interface TuiChatOptions {
 }
 
 export async function runTuiChat(options: TuiChatOptions): Promise<void> {
-  const { agent, provider, model, sessionKey = "cli/local" } = options;
+  const { agent, provider, model, sessionKey = "agent:main:dm:local" } = options;
 
   const terminal = new ProcessTerminal();
   const tui = new TUI(terminal, true);

@@ -15,6 +15,8 @@ export interface AgentRuntimeOptions {
   maxToolRounds?: number;
   defaultProvider?: string;
   defaultModel?: string;
+  /** Static system prompt, or async function that builds it dynamically per run. */
+  systemPrompt?: string | ((sessionKey: string) => Promise<string>);
 }
 
 export class AgentRuntime {
@@ -24,6 +26,7 @@ export class AgentRuntime {
   private maxToolRounds: number;
   private defaultProvider: string;
   private defaultModel: string;
+  private systemPrompt: string | ((sessionKey: string) => Promise<string>);
 
   constructor(options: AgentRuntimeOptions) {
     this.modelRouter = options.modelRouter;
@@ -32,6 +35,14 @@ export class AgentRuntime {
     this.maxToolRounds = options.maxToolRounds ?? 20;
     this.defaultProvider = options.defaultProvider ?? "claude";
     this.defaultModel = options.defaultModel ?? "";
+    this.systemPrompt = options.systemPrompt ?? "";
+  }
+
+  private async resolveSystemPrompt(sessionKey: string): Promise<string> {
+    if (typeof this.systemPrompt === "function") {
+      return this.systemPrompt(sessionKey);
+    }
+    return this.systemPrompt;
   }
 
   async run(
@@ -46,6 +57,9 @@ export class AgentRuntime {
       model,
       history,
     } = options;
+
+    // Resolve system prompt (may be dynamic per session)
+    const resolvedSystemPrompt = await this.resolveSystemPrompt(sessionKey);
 
     // Get or create session history
     const session = await this.sessionManager.getOrCreate(sessionKey);
@@ -86,6 +100,7 @@ export class AgentRuntime {
         onChunk: (text) => {
           onEvent?.({ type: "text", content: text });
         },
+        system: resolvedSystemPrompt || undefined,
       });
 
       // Emit per-round usage so the UI can show real-time token counts
@@ -174,6 +189,7 @@ export class AgentRuntime {
       onChunk: (text) => {
         onEvent?.({ type: "text", content: text });
       },
+      system: resolvedSystemPrompt || undefined,
     });
 
     addUsage(finalResponse.usage);

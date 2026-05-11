@@ -10,7 +10,8 @@ import { SessionStore } from "../../sessions/store.js";
 import { ChannelManager } from "../../channels/manager.js";
 import { CliChannel } from "../../channels/cli-channel/index.js";
 import { bootstrapPlugins } from "../../plugins/bootstrap.js";
-import { getSessionsDir } from "../../config/paths.js";
+import { getSessionsDir, getWorkspaceDir } from "../../config/paths.js";
+import { ContextBuilder } from "../../workspace/context-builder.js";
 import type { AgentParams } from "../../gateway/protocol/types.js";
 
 export function addGatewayCommand(program: Command): void {
@@ -43,6 +44,10 @@ export function addGatewayCommand(program: Command): void {
       await sessionStore.init();
       const sessionManager = new SessionManager(sessionStore);
 
+      // Setup workspace context
+      const contextBuilder = new ContextBuilder(getWorkspaceDir());
+      await contextBuilder.init();
+
       // Setup agent runtime
       const agent = new AgentRuntime({
         modelRouter,
@@ -51,6 +56,7 @@ export function addGatewayCommand(program: Command): void {
         maxToolRounds: config.agent.maxToolRounds,
         defaultProvider: config.agent.defaultProvider,
         defaultModel: config.agent.defaultModel,
+        systemPrompt: async (sessionKey) => contextBuilder.buildSystemPrompt(sessionKey),
       });
 
       // Setup gateway

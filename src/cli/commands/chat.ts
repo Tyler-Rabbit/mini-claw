@@ -7,7 +7,8 @@ import { builtinTools } from "../../agent/tools/index.js";
 import { SessionManager } from "../../sessions/manager.js";
 import { SessionStore } from "../../sessions/store.js";
 import { bootstrapPlugins } from "../../plugins/bootstrap.js";
-import { getSessionsDir } from "../../config/paths.js";
+import { getSessionsDir, getWorkspaceDir } from "../../config/paths.js";
+import { ContextBuilder } from "../../workspace/context-builder.js";
 import { runTuiChat } from "../tui-chat.js";
 
 export function addChatCommand(program: Command): void {
@@ -41,6 +42,10 @@ export function addChatCommand(program: Command): void {
       await sessionStore.init();
       const sessionManager = new SessionManager(sessionStore);
 
+      // Setup workspace context
+      const contextBuilder = new ContextBuilder(getWorkspaceDir());
+      await contextBuilder.init();
+
       // Setup agent
       const agent = new AgentRuntime({
         modelRouter,
@@ -49,6 +54,7 @@ export function addChatCommand(program: Command): void {
         maxToolRounds: config.agent.maxToolRounds,
         defaultProvider: provider,
         defaultModel: model,
+        systemPrompt: async (sessionKey) => contextBuilder.buildSystemPrompt(sessionKey),
       });
 
       // Launch TUI chat

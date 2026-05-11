@@ -65,6 +65,7 @@ export interface ModelProvider {
     model?: string;
     stream?: boolean;
     onChunk?: (text: string) => void;
+    system?: string;
   }): Promise<ModelResponse>;
 }
 

@@ -54,7 +54,7 @@ export class CliChannel implements ChannelPlugin {
           senderId: "local",
           senderName: "User",
           channel: "cli",
-          sessionKey: "cli/local",
+          sessionKey: "agent:main:dm:local",
           timestamp: new Date(),
         });
       } catch (err) {
@@ -100,7 +100,7 @@ export class CliChannel implements ChannelPlugin {
           text: "/clear",
           senderId: "local",
           channel: "cli",
-          sessionKey: "cli/local",
+          sessionKey: "agent:main:dm:local",
           timestamp: new Date(),
         }).then(() => {
           console.log(`${c.dim}Session cleared.${c.reset}`);

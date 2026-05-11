@@ -24,10 +24,13 @@ export class OpenAIProvider implements ModelProvider {
     model?: string;
     stream?: boolean;
     onChunk?: (text: string) => void;
+    system?: string;
   }): Promise<ModelResponse> {
     const model = params.model ?? this.defaultModel;
 
-    const oaiMessages: OpenAI.ChatCompletionMessageParam[] = params.messages.map(
+    const oaiMessages: OpenAI.ChatCompletionMessageParam[] = [
+      ...(params.system ? [{ role: "system" as const, content: params.system }] : []),
+      ...params.messages.map(
       (m) => {
         if (m.role === "tool") {
           return {
@@ -52,7 +55,7 @@ export class OpenAIProvider implements ModelProvider {
         }
         return { role: m.role, content: m.content };
       }
-    );
+    )];
 
     const oaiTools: OpenAI.ChatCompletionTool[] | undefined = params.tools?.map(
       (t) => ({

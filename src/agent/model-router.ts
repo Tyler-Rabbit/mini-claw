@@ -42,6 +42,7 @@ export class ModelRouter {
     provider?: string;
     stream?: boolean;
     onChunk?: (text: string) => void;
+    system?: string;
   }): Promise<ModelResponse> {
     const provider = this.getProvider(params.provider);
     return provider.chat(params);

@@ -16,6 +16,14 @@ export function getSessionsDir(): string {
   return join(getConfigDir(), "sessions");
 }
 
+export function getWorkspaceDir(): string {
+  return join(getConfigDir(), "workspace");
+}
+
+export function getMemoryDir(): string {
+  return join(getWorkspaceDir(), "memory");
+}
+
 export async function ensureConfigDir(): Promise<void> {
   await mkdir(getConfigDir(), { recursive: true });
 }

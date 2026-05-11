@@ -134,7 +134,7 @@ export class SessionStore {
   }
 
   private sanitize(key: string): string {
-    return key.replace(/\//g, "_");
+    return key.replace(/[:/]/g, "_");
   }
 
   private async flushIndex(): Promise<void> {

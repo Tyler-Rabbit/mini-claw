@@ -24,15 +24,13 @@ export class ClaudeProvider implements ModelProvider {
     model?: string;
     stream?: boolean;
     onChunk?: (text: string) => void;
+    system?: string;
   }): Promise<ModelResponse> {
     const model = params.model ?? this.defaultModel;
+    const system = params.system;
 
     // Convert messages to Claude format
-    const systemMsg = params.messages.find((m) => m.role === "user" && m.content.startsWith("system:"));
-    const system = systemMsg?.content.replace("system:", "").trim();
-
     const claudeMessages: Anthropic.MessageParam[] = params.messages
-      .filter((m) => m.role !== "tool" || !m.content.startsWith("system:"))
       .map((m) => {
         if (m.role === "tool") {
           return {

@@ -52,6 +52,7 @@ export class XiaomiProvider implements ModelProvider {
     model?: string;
     stream?: boolean;
     onChunk?: (text: string) => void;
+    system?: string;
   }): Promise<ModelResponse> {
     return this.protocol === "anthropic"
       ? this.chatAnthropic(params)
@@ -66,11 +67,15 @@ export class XiaomiProvider implements ModelProvider {
     model?: string;
     stream?: boolean;
     onChunk?: (text: string) => void;
+    system?: string;
   }): Promise<ModelResponse> {
     const model = params.model ?? this.defaultModel;
     const client = this.oaiClient!;
 
-    const oaiMessages = this.toOpenAIMessages(params.messages);
+    const oaiMessages = [
+      ...(params.system ? [{ role: "system" as const, content: params.system }] : []),
+      ...this.toOpenAIMessages(params.messages),
+    ];
     const oaiTools = this.toOpenAITools(params.tools);
 
     if (params.stream && params.onChunk) {
@@ -174,17 +179,13 @@ export class XiaomiProvider implements ModelProvider {
     model?: string;
     stream?: boolean;
     onChunk?: (text: string) => void;
+    system?: string;
   }): Promise<ModelResponse> {
     const model = params.model ?? this.defaultModel;
     const client = this.anthropicClient!;
-
-    const systemMsg = params.messages.find(
-      (m) => m.role === "user" && m.content.startsWith("system:")
-    );
-    const system = systemMsg?.content.replace("system:", "").trim();
+    const system = params.system;
 
     const claudeMessages: Anthropic.MessageParam[] = params.messages
-      .filter((m) => m.role !== "tool" || !m.content.startsWith("system:"))
       .map((m) => {
         if (m.role === "tool") {
           return {

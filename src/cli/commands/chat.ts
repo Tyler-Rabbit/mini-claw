@@ -21,7 +21,8 @@ export function addChatCommand(program: Command): void {
     .action(async (options) => {
       const config = await loadConfig(options.config);
       const provider = options.provider ?? config.agent.defaultProvider;
-      const model = options.model ?? config.agent.defaultModel;
+      const providerModel = config.agent.providers?.[provider]?.model;
+      const model = options.model ?? (config.agent.defaultModel || providerModel || "");
 
       // Bootstrap plugins
       const { providers, tools: pluginTools } = await bootstrapPlugins(config);

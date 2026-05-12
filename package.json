@@ -35,6 +35,14 @@
     "LICENSE"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tylerge99/mini-claw.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tylerge99/mini-claw/issues"
+  },
+  "homepage": "https://github.com/tylerge99/mini-claw#readme",
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",

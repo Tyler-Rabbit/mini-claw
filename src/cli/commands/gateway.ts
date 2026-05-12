@@ -12,7 +12,7 @@ import { CliChannel } from "../../channels/cli-channel/index.js";
 import { bootstrapPlugins } from "../../plugins/bootstrap.js";
 import { getSessionsDir, getWorkspaceDir } from "../../config/paths.js";
 import { ContextBuilder } from "../../workspace/context-builder.js";
-import type { AgentParams } from "../../gateway/protocol/types.js";
+import type { AgentParams, AbortParams } from "../../gateway/protocol/types.js";
 
 export function addGatewayCommand(program: Command): void {
   program
@@ -62,10 +62,15 @@ export function addGatewayCommand(program: Command): void {
       // Setup gateway
       const gateway = new GatewayServer();
 
+      const activeRuns = new Map<string, AbortController>();
+
       // Register agent handler on gateway
       gateway.getRouter().register("agent", async (ctx) => {
         const params = ctx.params as AgentParams & { id: string };
         const requestId = params.id;
+
+        const ac = new AbortController();
+        activeRuns.set(requestId, ac);
 
         try {
           ctx.send({
@@ -81,6 +86,7 @@ export function addGatewayCommand(program: Command): void {
               message: params.message,
               sessionKey: params.sessionKey,
               model: params.model,
+              signal: ac.signal,
             },
             (event) => {
               if (event.type === "text" && event.content) {
@@ -130,6 +136,33 @@ export function addGatewayCommand(program: Command): void {
             type: "event",
             event: "agent:error",
             payload: { runId: requestId, error: message },
+          });
+        } finally {
+          activeRuns.delete(requestId);
+        }
+      });
+
+      // Register agent:abort handler on gateway
+      gateway.getRouter().register("agent:abort", async (ctx) => {
+        const params = ctx.params as AbortParams & { id: string };
+        const { runId } = params;
+
+        const ac = activeRuns.get(runId);
+        if (ac) {
+          ac.abort();
+          activeRuns.delete(runId);
+          ctx.send({
+            type: "res",
+            id: params.id,
+            ok: true,
+            payload: { status: "aborted" },
+          });
+        } else {
+          ctx.send({
+            type: "res",
+            id: params.id,
+            ok: false,
+            error: { message: `No active run found: ${runId}` },
           });
         }
       });

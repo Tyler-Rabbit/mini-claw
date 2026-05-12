@@ -171,7 +171,7 @@ describe("CompactionModule", () => {
 
       // Should have: summary message + 2 recent messages
       expect(result).toHaveLength(3);
-      expect(result[0].role).toBe("system");
+      expect(result[0].role).toBe("user");
       expect(result[0].content).toContain("[Compacted Summary]");
       expect(result[0].content).toContain("weather");
       expect(result[1].content).toBe("what time is it?");
@@ -193,7 +193,7 @@ describe("CompactionModule", () => {
       expect(result).toHaveLength(3);
       expect(result[0].role).toBe("system");
       expect(result[0].content).toBe("You are a coding assistant.");
-      expect(result[1].role).toBe("system");
+      expect(result[1].role).toBe("user");
       expect(result[1].content).toContain("[Compacted Summary]");
       expect(result[2].content).toBe("thanks");
     });

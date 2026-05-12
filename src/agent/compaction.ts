@@ -104,7 +104,7 @@ export class CompactionModule {
     );
 
     const summaryMsg: ModelMessage = {
-      role: "system",
+      role: "user",
       content: `[Compacted Summary]\n${summaryText}`,
     };
 

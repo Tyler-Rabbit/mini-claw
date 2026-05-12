@@ -43,6 +43,7 @@ export class ModelRouter {
     stream?: boolean;
     onChunk?: (text: string) => void;
     system?: string;
+    signal?: AbortSignal;
   }): Promise<ModelResponse> {
     const provider = this.getProvider(params.provider);
     return provider.chat(params);

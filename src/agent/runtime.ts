@@ -4,12 +4,14 @@ import type {
   StreamCallback,
   TokenUsage,
   ContextPrunerConfig,
+  CompactionConfig,
 } from "./types.js";
-import { DEFAULT_CONTEXT_PRUNER_CONFIG } from "./types.js";
+import { DEFAULT_CONTEXT_PRUNER_CONFIG, DEFAULT_COMPACTION_CONFIG } from "./types.js";
 import type { ModelRouter } from "./model-router.js";
 import type { ToolRegistry } from "./tool-registry.js";
 import type { SessionManager } from "../sessions/manager.js";
 import { ContextPruner } from "./context-pruner.js";
+import { CompactionModule } from "./compaction.js";
 
 export interface AgentRuntimeOptions {
   modelRouter: ModelRouter;
@@ -21,6 +23,7 @@ export interface AgentRuntimeOptions {
   /** Static system prompt, or async function that builds it dynamically per run. */
   systemPrompt?: string | ((sessionKey: string) => Promise<string>);
   contextPruner?: ContextPrunerConfig;
+  compaction?: CompactionConfig;
 }
 
 export class AgentRuntime {
@@ -32,6 +35,7 @@ export class AgentRuntime {
   private defaultModel: string;
   private systemPrompt: string | ((sessionKey: string) => Promise<string>);
   private contextPruner: ContextPruner;
+  private compaction: CompactionModule;
 
   constructor(options: AgentRuntimeOptions) {
     this.modelRouter = options.modelRouter;
@@ -43,6 +47,9 @@ export class AgentRuntime {
     this.systemPrompt = options.systemPrompt ?? "";
     this.contextPruner = new ContextPruner(
       options.contextPruner ?? DEFAULT_CONTEXT_PRUNER_CONFIG
+    );
+    this.compaction = new CompactionModule(
+      options.compaction ?? DEFAULT_COMPACTION_CONFIG
     );
   }
 
@@ -132,6 +139,23 @@ export class AgentRuntime {
       addUsage(response.usage);
       if (response.usage) {
         onEvent?.({ type: "usage", usage: totalUsage });
+      }
+
+      // Check if compaction is needed
+      this.compaction.recordUsage(sessionKey, response.usage ?? { inputTokens: 0, outputTokens: 0 });
+      if (this.compaction.needsCompaction(sessionKey, totalUsage)) {
+        const compacted = await this.compaction.compact(
+          sessionKey,
+          messages,
+          this.modelRouter
+        );
+        messages.length = 0;
+        messages.push(...compacted);
+        session.history = [...compacted];
+        onEvent?.({
+          type: "text",
+          content: "\n🧹 Auto-compaction complete.\n",
+        });
       }
 
       // If no tool calls, we're done
@@ -249,5 +273,21 @@ export class AgentRuntime {
 
   async runSimple(message: string, sessionKey: string): Promise<string> {
     return this.run({ message, sessionKey });
+  }
+
+  /** Manually trigger compaction on a session's history. */
+  async compactSession(
+    sessionKey: string,
+    instruction?: string
+  ): Promise<ModelMessage[]> {
+    const session = await this.sessionManager.getOrCreate(sessionKey);
+    const compacted = await this.compaction.compact(
+      sessionKey,
+      session.history,
+      this.modelRouter,
+      instruction
+    );
+    session.history = [...compacted];
+    return compacted;
   }
 }

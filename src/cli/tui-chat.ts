@@ -298,7 +298,7 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
   }
 
   // --- Editor submit ---
-  editor.onSubmit = (text: string) => {
+  editor.onSubmit = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
 
@@ -333,6 +333,7 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
             "  /clear    Clear screen only",
             "  /model    Show model info",
             "  /skills   List available skills",
+            "  /compact  Compact conversation history (optional: /compact <instruction>)",
             "  /quit     Exit",
             "  /help     Show this help",
             "",
@@ -359,6 +360,19 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
             addMessage("system", "No skills available.");
           }
           break;
+        case "/compact": {
+          const instruction = trimmed.slice("/compact".length).trim() || undefined;
+          addMessage("system", "Compacting conversation...");
+          tui.requestRender();
+          try {
+            await agent.compactSession(sessionKey, instruction);
+            addMessage("system", "Conversation compacted.");
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            addMessage("system", chalk.red("Compaction failed: " + msg));
+          }
+          break;
+        }
         default:
           // Check if it's a skill command
           if (skillExecutor && skillExecutor.isSlashCommand(trimmed)) {

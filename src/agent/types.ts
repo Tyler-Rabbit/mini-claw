@@ -63,6 +63,34 @@ export const DEFAULT_CONTEXT_PRUNER_CONFIG: ContextPrunerConfig = {
   hardPrunePlaceholder: "[tool result pruned - old output]",
 };
 
+export interface CompactionConfig {
+  enabled: boolean;
+  maxMessages: number;
+  maxInputTokens: number;
+  keepRecentMessages: number;
+  summaryPrompt: string;
+}
+
+export const DEFAULT_COMPACTION_CONFIG: CompactionConfig = {
+  enabled: true,
+  maxMessages: 50,
+  maxInputTokens: 100_000,
+  keepRecentMessages: 5,
+  summaryPrompt: `You are a conversation summarizer. Produce a concise summary of the conversation below.
+Preserve:
+- Key decisions and their reasoning
+- User preferences and constraints
+- Important tool results (data, errors, configurations)
+- Open questions or unfinished tasks
+
+Omit:
+- Routine tool calls with no lasting significance
+- Repeated or redundant information
+- Boilerplate and formatting
+
+The summary will be used as context for continuing the conversation.`,
+};
+
 export interface AgentStreamEvent {
   type: "text" | "tool_use" | "tool_result" | "error" | "done" | "usage";
   content?: string;

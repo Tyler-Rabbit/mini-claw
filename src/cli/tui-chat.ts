@@ -94,6 +94,7 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
   let roundStartTime = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  let abortController: AbortController | null = null;
 
   // Register skill invocation callback for agent-driven skill calls
   if (setSkillInvokedCallback) {
@@ -167,9 +168,10 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
     totalOutputTokens = 0;
     startProgressTimer();
 
+    abortController = new AbortController();
     try {
       await agent.run(
-        { message: text, sessionKey, channel: "cli", senderId: "local" },
+        { message: text, sessionKey, channel: "cli", senderId: "local", signal: abortController.signal },
         (event: AgentStreamEvent) => {
           if (event.type === "text" && event.content) {
             streamingText += event.content;
@@ -269,6 +271,7 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
       addMessage("system", chalk.red("Error: " + msg));
     }
 
+    abortController = null;
     streamingText = "";
     streamingMarkdown = null;
     isBusy = false;
@@ -309,7 +312,7 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
               : "  No skills available",
             "",
             "Shortcuts:",
-            "  Ctrl+C    Clear input / exit",
+            "  Ctrl+C    Stop response / Clear input / exit",
             "  Ctrl+D    Exit",
             "  Enter     Send message",
           ].join("\n"));
@@ -375,7 +378,11 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
 
   tui.addInputListener((data) => {
     if (matchesKey(data, "ctrl+c")) {
-      if (isBusy) return { consume: true }; // ignore while processing
+      if (isBusy) {
+        // Abort the current response
+        abortController?.abort();
+        return { consume: true };
+      }
       const now = Date.now();
       if (now - lastCtrlCTime < 1500) {
         // Double press — exit

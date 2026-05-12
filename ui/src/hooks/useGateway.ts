@@ -17,6 +17,7 @@ export function useGateway(url: string) {
   const [streamingToolCalls, setStreamingToolCalls] = useState<ToolCall[]>([])
   const streamBufferRef = useRef('')
   const toolCallsRef = useRef<ToolCall[]>([])
+  const currentRunIdRef = useRef<string | null>(null)
 
   const connect = useCallback(async () => {
     if (clientRef.current?.connected) return
@@ -29,6 +30,7 @@ export function useGateway(url: string) {
       if (done) {
         setIsStreaming(false)
         setStreamingText(streamBufferRef.current)
+        currentRunIdRef.current = null
       } else {
         streamBufferRef.current += text
         setStreamingText(streamBufferRef.current)
@@ -64,6 +66,7 @@ export function useGateway(url: string) {
       const { error } = payload as { runId: string; error: string }
       setIsStreaming(false)
       setStreamingText(`Error: ${error}`)
+      currentRunIdRef.current = null
     })
 
     try {
@@ -91,11 +94,29 @@ export function useGateway(url: string) {
     setStreamingToolCalls([])
     setIsStreaming(true)
     try {
-      await client.sendAgentMessage(message)
+      const { promise, id } = client.sendAgentMessageWithId(message)
+      currentRunIdRef.current = id
+      await promise
     } catch (e) {
       setIsStreaming(false)
       setStreamingText(`Error: ${(e as Error).message}`)
     }
+  }, [])
+
+  const abort = useCallback(async () => {
+    const client = clientRef.current
+    if (!client?.connected) return
+    // Immediately stop streaming UI
+    setIsStreaming(false)
+    // Send abort to server
+    if (currentRunIdRef.current) {
+      try {
+        await client.sendAbort(currentRunIdRef.current)
+      } catch {
+        // Ignore — run may have already finished
+      }
+    }
+    currentRunIdRef.current = null
   }, [])
 
   useEffect(() => {
@@ -103,7 +124,7 @@ export function useGateway(url: string) {
   }, [])
 
   return {
-    connected, connecting, connect, disconnect, sendMessage,
+    connected, connecting, connect, disconnect, sendMessage, abort,
     streamingText, isStreaming, streamingToolCalls,
   }
 }

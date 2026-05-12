@@ -266,4 +266,46 @@ describe("CompactionModule", () => {
       expect(mod.needsCompaction("s1", makeUsage(0))).toBe(false);
     });
   });
+
+  describe("end-to-end", () => {
+    it("should compact when message threshold is hit during simulated run", async () => {
+      const mod = new CompactionModule(makeConfig({
+        maxMessages: 3,
+        keepRecentMessages: 2,
+      }));
+
+      const summaryLog: string[] = [];
+      const router = {
+        chat: async (params: { messages: ModelMessage[] }) => {
+          summaryLog.push(params.messages.map(m => m.content).join("\n"));
+          return {
+            content: "Compacted summary of the conversation.",
+            toolCalls: [],
+            stopReason: "end_turn" as const,
+            usage: { inputTokens: 100, outputTokens: 50 },
+          };
+        },
+      } as unknown as ModelRouter;
+
+      // Simulate 6 message rounds
+      const messages: ModelMessage[] = [];
+      for (let i = 0; i < 6; i++) {
+        messages.push(makeUser(`question ${i}`));
+        messages.push(makeAssistant(`answer ${i}`));
+        mod.recordUsage("s1", makeUsage(500));
+
+        if (mod.needsCompaction("s1", makeUsage((i + 1) * 500))) {
+          const compacted = await mod.compact("s1", messages, router);
+          messages.length = 0;
+          messages.push(...compacted);
+        }
+      }
+
+      // Should have triggered compaction
+      expect(summaryLog.length).toBeGreaterThan(0);
+      // Final messages should include summary + 2 recent
+      expect(messages.length).toBeLessThanOrEqual(3);
+      expect(messages[0].content).toContain("[Compacted Summary]");
+    });
+  });
 });

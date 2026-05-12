@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import type { CompactionConfig } from "../agent/types.js";
 import { getConfigFilePath } from "./paths.js";
 
 export interface ProviderConfig {
@@ -21,6 +22,7 @@ export interface MiniClawConfig {
     openaiModel?: string;
     maxToolRounds: number;
     providers?: Record<string, ProviderConfig>;
+    compaction?: Partial<CompactionConfig>;
   };
   plugins: {
     enabled: boolean;

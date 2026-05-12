@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { loadConfig } from "../../config/config.js";
+import { DEFAULT_COMPACTION_CONFIG } from "../../agent/types.js";
 import { AgentRuntime } from "../../agent/runtime.js";
 import { ModelRouter } from "../../agent/model-router.js";
 import { ToolRegistry } from "../../agent/tool-registry.js";
@@ -72,6 +73,9 @@ export function addChatCommand(program: Command): void {
         maxToolRounds: config.agent.maxToolRounds,
         defaultProvider: provider,
         defaultModel: model,
+        compaction: config.agent.compaction
+          ? { ...DEFAULT_COMPACTION_CONFIG, ...config.agent.compaction }
+          : undefined,
         systemPrompt: async (sessionKey) => {
           const basePrompt = await contextBuilder.buildSystemPrompt(sessionKey);
           if (skills.length === 0) return basePrompt;

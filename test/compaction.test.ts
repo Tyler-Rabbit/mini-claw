@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { CompactionModule } from "../src/agent/compaction.js";
 import type { CompactionConfig, ModelMessage, TokenUsage } from "../src/agent/types.js";
 import { DEFAULT_COMPACTION_CONFIG } from "../src/agent/types.js";
+import type { ModelRouter } from "../src/agent/model-router.js";
+import type { ModelResponse } from "../src/agent/types.js";
 
 function makeConfig(overrides?: Partial<CompactionConfig>): CompactionConfig {
   return { ...DEFAULT_COMPACTION_CONFIG, ...overrides };
@@ -21,6 +23,17 @@ function makeSystem(content: string): ModelMessage {
 
 function makeUsage(inputTokens: number): TokenUsage {
   return { inputTokens, outputTokens: 0 };
+}
+
+function makeMockRouter(summary: string): ModelRouter {
+  return {
+    chat: async () => ({
+      content: summary,
+      toolCalls: [],
+      stopReason: "end_turn" as const,
+      usage: { inputTokens: 100, outputTokens: 50 },
+    }),
+  } as unknown as ModelRouter;
 }
 
 describe("CompactionModule", () => {
@@ -141,6 +154,116 @@ describe("CompactionModule", () => {
       const { toSummarize, toKeep } = mod.splitMessages(messages);
       expect(toSummarize).toHaveLength(0);
       expect(toKeep).toHaveLength(2);
+    });
+  });
+
+  describe("compact", () => {
+    it("should produce a summary message and keep recent messages", async () => {
+      const mod = new CompactionModule(makeConfig({ keepRecentMessages: 2 }));
+      const router = makeMockRouter("User asked about weather. Assistant said it was sunny.");
+      const messages: ModelMessage[] = [
+        makeUser("what's the weather?"),
+        makeAssistant("It's sunny today."),
+        makeUser("what time is it?"),
+        makeAssistant("It's 3pm."),
+      ];
+      const result = await mod.compact("s1", messages, router);
+
+      // Should have: summary message + 2 recent messages
+      expect(result).toHaveLength(3);
+      expect(result[0].role).toBe("system");
+      expect(result[0].content).toContain("[Compacted Summary]");
+      expect(result[0].content).toContain("weather");
+      expect(result[1].content).toBe("what time is it?");
+      expect(result[2].content).toBe("It's 3pm.");
+    });
+
+    it("should preserve system messages", async () => {
+      const mod = new CompactionModule(makeConfig({ keepRecentMessages: 1 }));
+      const router = makeMockRouter("Summary of conversation.");
+      const messages: ModelMessage[] = [
+        makeSystem("You are a coding assistant."),
+        makeUser("write a function"),
+        makeAssistant("Here is the function."),
+        makeUser("thanks"),
+      ];
+      const result = await mod.compact("s1", messages, router);
+
+      // system prompt + summary + 1 recent
+      expect(result).toHaveLength(3);
+      expect(result[0].role).toBe("system");
+      expect(result[0].content).toBe("You are a coding assistant.");
+      expect(result[1].role).toBe("system");
+      expect(result[1].content).toContain("[Compacted Summary]");
+      expect(result[2].content).toBe("thanks");
+    });
+
+    it("should include previous summary in next compaction (rolling)", async () => {
+      const mod = new CompactionModule(makeConfig({ keepRecentMessages: 1 }));
+      const router1 = makeMockRouter("First summary: user asked about weather.");
+      const router2 = makeMockRouter("Updated summary: weather and time discussed.");
+
+      // First compaction
+      const messages1: ModelMessage[] = [
+        makeUser("weather?"),
+        makeAssistant("sunny"),
+        makeUser("time?"),
+      ];
+      const result1 = await mod.compact("s1", messages1, router1);
+      expect(result1).toHaveLength(2); // summary + 1 recent
+
+      // Second compaction with new messages
+      const messages2: ModelMessage[] = [
+        ...result1,
+        makeAssistant("it's 3pm"),
+        makeUser("bye"),
+      ];
+      const result2 = await mod.compact("s1", messages2, router2);
+      expect(result2).toHaveLength(2); // updated summary + 1 recent
+      expect(result2[0].content).toContain("[Compacted Summary]");
+      expect(result2[0].content).toContain("Updated summary");
+    });
+
+    it("should use custom instruction when provided", async () => {
+      let capturedPrompt = "";
+      const mod = new CompactionModule(makeConfig({ keepRecentMessages: 0 }));
+      const router = {
+        chat: async (params: { messages: ModelMessage[] }) => {
+          capturedPrompt = params.messages.map(m => m.content).join("\n");
+          return {
+            content: "Custom summary.",
+            toolCalls: [],
+            stopReason: "end_turn" as const,
+            usage: { inputTokens: 100, outputTokens: 50 },
+          };
+        },
+      } as unknown as ModelRouter;
+
+      const messages: ModelMessage[] = [
+        makeUser("hello"),
+        makeAssistant("hi"),
+        makeUser("bye"),
+      ];
+      await mod.compact("s1", messages, router, "Focus on greetings");
+
+      expect(capturedPrompt).toContain("Focus on greetings");
+    });
+
+    it("should reset session state after compaction", async () => {
+      const mod = new CompactionModule(makeConfig({ maxMessages: 3, keepRecentMessages: 0 }));
+      const router = makeMockRouter("summary");
+
+      // Simulate reaching threshold
+      for (let i = 0; i < 4; i++) {
+        mod.recordUsage("s1", makeUsage(100));
+      }
+      expect(mod.needsCompaction("s1", makeUsage(400))).toBe(true);
+
+      // Compact
+      await mod.compact("s1", [makeUser("a"), makeAssistant("b")], router);
+
+      // After compaction, state should be reset
+      expect(mod.needsCompaction("s1", makeUsage(0))).toBe(false);
     });
   });
 });

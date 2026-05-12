@@ -1,4 +1,5 @@
 import type { CompactionConfig, ModelMessage, TokenUsage } from "./types.js";
+import type { ModelRouter } from "./model-router.js";
 
 interface SessionState {
   messageCount: number;
@@ -68,5 +69,88 @@ export class CompactionModule {
     const toSummarize = nonSystem.slice(0, nonSystem.length - keepCount);
 
     return { systemMessages, toSummarize, toKeep };
+  }
+
+  /** Compact conversation history into a summary. Returns new message array. */
+  async compact(
+    sessionKey: string,
+    messages: ModelMessage[],
+    modelRouter: ModelRouter,
+    instruction?: string
+  ): Promise<ModelMessage[]> {
+    const { systemMessages, toSummarize, toKeep } = this.splitMessages(messages);
+
+    if (toSummarize.length === 0) {
+      return [...messages];
+    }
+
+    const state = this.getState(sessionKey);
+
+    // Find existing summary in system messages for rolling updates
+    const existingSummary = systemMessages.find(
+      (m) => m.content.startsWith("[Compacted Summary]")
+    );
+
+    const summaryText = await this.summarize(
+      toSummarize,
+      modelRouter,
+      existingSummary?.content,
+      instruction
+    );
+
+    // Strip previous summary from system messages (we'll replace it)
+    const baseSystemMessages = systemMessages.filter(
+      (m) => !m.content.startsWith("[Compacted Summary]")
+    );
+
+    const summaryMsg: ModelMessage = {
+      role: "system",
+      content: `[Compacted Summary]\n${summaryText}`,
+    };
+
+    // Reset state after compaction
+    this.resetSession(sessionKey);
+    // Mark that we now have a summary
+    const newState = this.getState(sessionKey);
+    newState.hasSummary = true;
+
+    return [...baseSystemMessages, summaryMsg, ...toKeep];
+  }
+
+  private async summarize(
+    messages: ModelMessage[],
+    modelRouter: ModelRouter,
+    existingSummary?: string,
+    instruction?: string
+  ): Promise<string> {
+    const messagesText = messages
+      .map((m) => `[${m.role}]: ${m.content}`)
+      .join("\n\n");
+
+    let prompt = this.config.summaryPrompt;
+    if (instruction) {
+      prompt += `\n\nAdditional instruction: ${instruction}`;
+    }
+
+    const summaryRequest: ModelMessage[] = [];
+
+    if (existingSummary) {
+      summaryRequest.push({
+        role: "user",
+        content: `Previous summary:\n${existingSummary.replace("[Compacted Summary]\n", "")}\n\nNew messages to incorporate:\n${messagesText}\n\n${prompt}`,
+      });
+    } else {
+      summaryRequest.push({
+        role: "user",
+        content: `${messagesText}\n\n${prompt}`,
+      });
+    }
+
+    const response = await modelRouter.chat({
+      messages: summaryRequest,
+      stream: false,
+    });
+
+    return response.content;
   }
 }

@@ -75,7 +75,7 @@ export const DEFAULT_COMPACTION_CONFIG: CompactionConfig = {
   enabled: true,
   maxMessages: 50,
   maxInputTokens: 100_000,
-  keepRecentMessages: 5,
+  keepRecentMessages: 0,
   summaryPrompt: `You are a conversation summarizer. Produce a concise summary of the conversation below.
 Preserve:
 - Key decisions and their reasoning

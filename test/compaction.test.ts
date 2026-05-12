@@ -74,4 +74,73 @@ describe("CompactionModule", () => {
       expect(mod.needsCompaction("s1", makeUsage(0))).toBe(false);
     });
   });
+
+  describe("splitMessages", () => {
+    it("should separate system messages from compactable messages", () => {
+      const mod = new CompactionModule(makeConfig());
+      const messages: ModelMessage[] = [
+        makeSystem("You are a helpful assistant."),
+        makeUser("hello"),
+        makeAssistant("hi"),
+        makeUser("how are you?"),
+        makeAssistant("I'm good."),
+      ];
+      const { systemMessages, toSummarize, toKeep } = mod.splitMessages(messages);
+      expect(systemMessages).toHaveLength(1);
+      expect(systemMessages[0].content).toBe("You are a helpful assistant.");
+      expect(toSummarize).toHaveLength(4);
+      expect(toKeep).toHaveLength(0);
+    });
+
+    it("should keep recent N messages un-compacted", () => {
+      const mod = new CompactionModule(makeConfig({ keepRecentMessages: 2 }));
+      const messages: ModelMessage[] = [
+        makeSystem("system prompt"),
+        makeUser("msg1"),
+        makeAssistant("reply1"),
+        makeUser("msg2"),
+        makeAssistant("reply2"),
+        makeUser("msg3"),
+        makeAssistant("reply3"),
+      ];
+      const { systemMessages, toSummarize, toKeep } = mod.splitMessages(messages);
+      expect(systemMessages).toHaveLength(1);
+      // Last 2 messages (msg3, reply3) should be kept
+      expect(toKeep).toHaveLength(2);
+      expect(toKeep[0].content).toBe("msg3");
+      expect(toKeep[1].content).toBe("reply3");
+      // Everything else (except system) should be summarized
+      expect(toSummarize).toHaveLength(4);
+    });
+
+    it("should handle messages with no system messages", () => {
+      const mod = new CompactionModule(makeConfig());
+      const messages: ModelMessage[] = [
+        makeUser("hello"),
+        makeAssistant("hi"),
+      ];
+      const { systemMessages, toSummarize, toKeep } = mod.splitMessages(messages);
+      expect(systemMessages).toHaveLength(0);
+      expect(toSummarize).toHaveLength(2);
+    });
+
+    it("should handle empty messages array", () => {
+      const mod = new CompactionModule(makeConfig());
+      const { systemMessages, toSummarize, toKeep } = mod.splitMessages([]);
+      expect(systemMessages).toHaveLength(0);
+      expect(toSummarize).toHaveLength(0);
+      expect(toKeep).toHaveLength(0);
+    });
+
+    it("should keep all messages when fewer than keepRecentMessages", () => {
+      const mod = new CompactionModule(makeConfig({ keepRecentMessages: 10 }));
+      const messages: ModelMessage[] = [
+        makeUser("hello"),
+        makeAssistant("hi"),
+      ];
+      const { toSummarize, toKeep } = mod.splitMessages(messages);
+      expect(toSummarize).toHaveLength(0);
+      expect(toKeep).toHaveLength(2);
+    });
+  });
 });

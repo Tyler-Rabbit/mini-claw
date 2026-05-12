@@ -1,4 +1,4 @@
-import type { CompactionConfig, TokenUsage } from "./types.js";
+import type { CompactionConfig, ModelMessage, TokenUsage } from "./types.js";
 
 interface SessionState {
   messageCount: number;
@@ -44,5 +44,29 @@ export class CompactionModule {
   /** Reset session state (called after compaction completes). */
   resetSession(sessionKey: string): void {
     this.sessions.delete(sessionKey);
+  }
+
+  /** Split messages into system, to-summarize, and to-keep groups. */
+  splitMessages(messages: ModelMessage[]): {
+    systemMessages: ModelMessage[];
+    toSummarize: ModelMessage[];
+    toKeep: ModelMessage[];
+  } {
+    const systemMessages: ModelMessage[] = [];
+    const nonSystem: ModelMessage[] = [];
+
+    for (const msg of messages) {
+      if (msg.role === "system") {
+        systemMessages.push(msg);
+      } else {
+        nonSystem.push(msg);
+      }
+    }
+
+    const keepCount = Math.min(this.config.keepRecentMessages, nonSystem.length);
+    const toKeep = nonSystem.slice(nonSystem.length - keepCount);
+    const toSummarize = nonSystem.slice(0, nonSystem.length - keepCount);
+
+    return { systemMessages, toSummarize, toKeep };
   }
 }

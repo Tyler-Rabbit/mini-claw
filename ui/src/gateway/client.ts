@@ -122,4 +122,21 @@ export class GatewayClient {
   sendAgentMessage(message: string, sessionKey = 'default'): Promise<unknown> {
     return this.request('agent', { message, sessionKey })
   }
+
+  sendAbort(runId: string): Promise<unknown> {
+    return this.request('agent:abort', { runId })
+  }
+
+  sendAgentMessageWithId(message: string, sessionKey = 'default'): { promise: Promise<unknown>; id: string } {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return { promise: Promise.reject(new Error('Not connected')), id: '' }
+    }
+    const id = String(this.nextId++)
+    const p = new Promise<unknown>((resolve, reject) => {
+      this.pending.set(id, { resolve, reject })
+    })
+    const frame: RequestFrame = { type: 'req', id, method: 'agent', params: { message, sessionKey } }
+    this.ws.send(JSON.stringify(frame))
+    return { promise: p, id }
+  }
 }

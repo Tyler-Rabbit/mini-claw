@@ -3,10 +3,13 @@ import type {
   ModelMessage,
   StreamCallback,
   TokenUsage,
+  ContextPrunerConfig,
 } from "./types.js";
+import { DEFAULT_CONTEXT_PRUNER_CONFIG } from "./types.js";
 import type { ModelRouter } from "./model-router.js";
 import type { ToolRegistry } from "./tool-registry.js";
 import type { SessionManager } from "../sessions/manager.js";
+import { ContextPruner } from "./context-pruner.js";
 
 export interface AgentRuntimeOptions {
   modelRouter: ModelRouter;
@@ -17,6 +20,7 @@ export interface AgentRuntimeOptions {
   defaultModel?: string;
   /** Static system prompt, or async function that builds it dynamically per run. */
   systemPrompt?: string | ((sessionKey: string) => Promise<string>);
+  contextPruner?: ContextPrunerConfig;
 }
 
 export class AgentRuntime {
@@ -27,6 +31,7 @@ export class AgentRuntime {
   private defaultProvider: string;
   private defaultModel: string;
   private systemPrompt: string | ((sessionKey: string) => Promise<string>);
+  private contextPruner: ContextPruner;
 
   constructor(options: AgentRuntimeOptions) {
     this.modelRouter = options.modelRouter;
@@ -36,6 +41,9 @@ export class AgentRuntime {
     this.defaultProvider = options.defaultProvider ?? "claude";
     this.defaultModel = options.defaultModel ?? "";
     this.systemPrompt = options.systemPrompt ?? "";
+    this.contextPruner = new ContextPruner(
+      options.contextPruner ?? DEFAULT_CONTEXT_PRUNER_CONFIG
+    );
   }
 
   private async resolveSystemPrompt(sessionKey: string): Promise<string> {
@@ -68,6 +76,11 @@ export class AgentRuntime {
       ...(history ?? session.history),
       { role: "user", content: message },
     ];
+
+    // Prune old tool results to manage context size
+    const prunedMessages = this.contextPruner.prune(sessionKey, messages);
+    messages.length = 0;
+    messages.push(...prunedMessages);
 
     // Save user message
     const userMsg: ModelMessage = { role: "user", content: message };

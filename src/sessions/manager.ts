@@ -69,6 +69,13 @@ export class SessionManager {
     }
   }
 
+  /** Rewrite session file with compacted messages (no-op if no store configured). */
+  async rewriteHistory(key: string, messages: ModelMessage[]): Promise<void> {
+    if (this.store) {
+      await this.store.rewriteSession(key, messages);
+    }
+  }
+
   list(): Session[] {
     return [...this.sessions.values()];
   }

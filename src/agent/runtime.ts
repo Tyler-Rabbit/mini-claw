@@ -152,6 +152,7 @@ export class AgentRuntime {
         messages.length = 0;
         messages.push(...compacted);
         session.history = [...compacted];
+        await this.sessionManager.rewriteHistory(sessionKey, compacted);
         onEvent?.({
           type: "text",
           content: "\n🧹 Auto-compaction complete.\n",
@@ -288,6 +289,7 @@ export class AgentRuntime {
       instruction
     );
     session.history = [...compacted];
+    await this.sessionManager.rewriteHistory(sessionKey, compacted);
     return compacted;
   }
 }

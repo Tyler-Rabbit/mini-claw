@@ -100,6 +100,27 @@ export class SessionStore {
     await this.flushIndex();
   }
 
+  /** Rewrite a session's .jsonl file with the given messages (used after compaction). */
+  async rewriteSession(key: string, messages: ModelMessage[]): Promise<void> {
+    const prev = this.locks.get(key) ?? Promise.resolve();
+    const next = prev.then(() => this.doRewriteSession(key, messages));
+    this.locks.set(key, next);
+    return next;
+  }
+
+  private async doRewriteSession(key: string, messages: ModelMessage[]): Promise<void> {
+    const filePath = this.jsonlPath(key);
+    const content = messages.map((m) => JSON.stringify(m)).join("\n") + "\n";
+    await writeFile(filePath, content, { flag: "w" });
+
+    const meta = this.index[key];
+    if (meta) {
+      meta.messageCount = messages.length;
+      meta.updatedAt = new Date().toISOString();
+      await this.flushIndex();
+    }
+  }
+
   /** Truncate a session's .jsonl file and reset its metadata. */
   async clearSession(key: string): Promise<void> {
     const filePath = this.jsonlPath(key);

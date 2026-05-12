@@ -25,6 +25,7 @@ export class OpenAIProvider implements ModelProvider {
     stream?: boolean;
     onChunk?: (text: string) => void;
     system?: string;
+    signal?: AbortSignal;
   }): Promise<ModelResponse> {
     const model = params.model ?? this.defaultModel;
 
@@ -74,7 +75,7 @@ export class OpenAIProvider implements ModelProvider {
         messages: oaiMessages,
         ...(oaiTools ? { tools: oaiTools } : {}),
         stream: true,
-      });
+      }, { signal: params.signal });
 
       let fullText = "";
       let usage: TokenUsage | undefined;

@@ -25,6 +25,7 @@ export class ClaudeProvider implements ModelProvider {
     stream?: boolean;
     onChunk?: (text: string) => void;
     system?: string;
+    signal?: AbortSignal;
   }): Promise<ModelResponse> {
     const model = params.model ?? this.defaultModel;
     const system = params.system;
@@ -78,7 +79,7 @@ export class ClaudeProvider implements ModelProvider {
         ...(system ? { system } : {}),
         messages: claudeMessages,
         ...(claudeTools ? { tools: claudeTools } : {}),
-      });
+      }, { signal: params.signal });
 
       let fullText = "";
       const toolCalls: ModelToolCall[] = [];

@@ -16,7 +16,7 @@ function makeAssistant(content: string): ModelMessage {
 }
 
 function makeSystem(content: string): ModelMessage {
-  return { role: "system", content } as ModelMessage;
+  return { role: "system", content };
 }
 
 function makeUsage(inputTokens: number): TokenUsage {
@@ -77,7 +77,7 @@ describe("CompactionModule", () => {
 
   describe("splitMessages", () => {
     it("should separate system messages from compactable messages", () => {
-      const mod = new CompactionModule(makeConfig());
+      const mod = new CompactionModule(makeConfig({ keepRecentMessages: 0 }));
       const messages: ModelMessage[] = [
         makeSystem("You are a helpful assistant."),
         makeUser("hello"),
@@ -114,7 +114,7 @@ describe("CompactionModule", () => {
     });
 
     it("should handle messages with no system messages", () => {
-      const mod = new CompactionModule(makeConfig());
+      const mod = new CompactionModule(makeConfig({ keepRecentMessages: 0 }));
       const messages: ModelMessage[] = [
         makeUser("hello"),
         makeAssistant("hi"),

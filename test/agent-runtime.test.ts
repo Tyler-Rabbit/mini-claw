@@ -292,3 +292,63 @@ describe("AgentRuntime abort", () => {
     expect(events.some((e) => e.type === "done")).toBe(true);
   });
 });
+
+describe("AgentRuntime with context pruning", () => {
+  it("should prune old tool results across multiple run() calls", async () => {
+    const mockProvider = new MockProvider();
+    mockProvider.setResponses([
+      {
+        content: "",
+        toolCalls: [{ id: "tc-1", name: "echo", arguments: { text: "first" } }],
+        stopReason: "tool_use",
+      },
+      { content: "First done", toolCalls: [], stopReason: "end_turn" },
+      {
+        content: "",
+        toolCalls: [{ id: "tc-2", name: "echo", arguments: { text: "second" } }],
+        stopReason: "tool_use",
+      },
+      { content: "Second done", toolCalls: [], stopReason: "end_turn" },
+      { content: "Third response", toolCalls: [], stopReason: "end_turn" },
+    ]);
+
+    const router = new ModelRouter();
+    router.registerProvider(mockProvider);
+
+    const toolRegistry = new ToolRegistry();
+    toolRegistry.register(echoTool);
+
+    const sessionManager = new SessionManager();
+    const agent = new AgentRuntime({
+      modelRouter: router,
+      toolRegistry,
+      sessionManager,
+      defaultProvider: "mock",
+      contextPruner: {
+        mode: "cache-ttl",
+        ttl: 0, // expire immediately so pruning happens on every call
+        softTrimThreshold: 10,
+        softTrimHead: 3,
+        softTrimTail: 3,
+        hardPrunePlaceholder: "[pruned]",
+      },
+    });
+
+    // First run
+    await agent.run({ message: "first", sessionKey: "prune-integration" });
+    // Second run — old tool results should be pruned
+    await agent.run({ message: "second", sessionKey: "prune-integration" });
+    // Third run — works with pruned context
+    const result = await agent.run({ message: "third", sessionKey: "prune-integration" });
+    expect(result).toBe("Third response");
+
+    // Verify session history is NOT modified (full history preserved)
+    const session = sessionManager.get("prune-integration");
+    expect(session).toBeDefined();
+    const toolMsgs = session!.history.filter((m) => m.role === "tool");
+    expect(toolMsgs.length).toBe(2);
+    // Original content preserved in session
+    expect(toolMsgs[0].content).toBe("Echo: first");
+    expect(toolMsgs[1].content).toBe("Echo: second");
+  });
+});

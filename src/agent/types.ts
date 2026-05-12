@@ -42,6 +42,7 @@ export interface AgentRunOptions {
   senderId?: string;
   model?: string;
   history?: ModelMessage[];
+  signal?: AbortSignal;
 }
 
 export interface AgentStreamEvent {
@@ -66,6 +67,7 @@ export interface ModelProvider {
     stream?: boolean;
     onChunk?: (text: string) => void;
     system?: string;
+    signal?: AbortSignal;
   }): Promise<ModelResponse>;
 }
 

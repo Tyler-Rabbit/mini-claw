@@ -270,7 +270,9 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
       loader.stop();
       root.removeChild(loader);
       const msg = err instanceof Error ? err.message : String(err);
-      addMessage("system", chalk.red("Error: " + msg));
+      if (!msg.includes("aborted")) {
+        addMessage("system", chalk.red("Error: " + msg));
+      }
     }
 
     abortController = null;

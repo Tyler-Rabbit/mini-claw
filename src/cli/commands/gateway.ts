@@ -132,11 +132,13 @@ export function addGatewayCommand(program: Command): void {
           );
         } catch (err) {
           const message = err instanceof Error ? err.message : "Unknown error";
-          ctx.send({
-            type: "event",
-            event: "agent:error",
-            payload: { runId: requestId, error: message },
-          });
+          if (!message.includes("aborted")) {
+            ctx.send({
+              type: "event",
+              event: "agent:error",
+              payload: { runId: requestId, error: message },
+            });
+          }
         } finally {
           activeRuns.delete(requestId);
         }

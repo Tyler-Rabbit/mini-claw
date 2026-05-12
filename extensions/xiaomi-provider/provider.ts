@@ -53,6 +53,7 @@ export class XiaomiProvider implements ModelProvider {
     stream?: boolean;
     onChunk?: (text: string) => void;
     system?: string;
+    signal?: AbortSignal;
   }): Promise<ModelResponse> {
     return this.protocol === "anthropic"
       ? this.chatAnthropic(params)
@@ -68,6 +69,7 @@ export class XiaomiProvider implements ModelProvider {
     stream?: boolean;
     onChunk?: (text: string) => void;
     system?: string;
+    signal?: AbortSignal;
   }): Promise<ModelResponse> {
     const model = params.model ?? this.defaultModel;
     const client = this.oaiClient!;
@@ -84,7 +86,7 @@ export class XiaomiProvider implements ModelProvider {
         messages: oaiMessages,
         ...(oaiTools ? { tools: oaiTools } : {}),
         stream: true,
-      });
+      }, { signal: params.signal });
 
       let fullText = "";
       let usage: TokenUsage | undefined;
@@ -180,6 +182,7 @@ export class XiaomiProvider implements ModelProvider {
     stream?: boolean;
     onChunk?: (text: string) => void;
     system?: string;
+    signal?: AbortSignal;
   }): Promise<ModelResponse> {
     const model = params.model ?? this.defaultModel;
     const client = this.anthropicClient!;
@@ -236,7 +239,7 @@ export class XiaomiProvider implements ModelProvider {
         ...(system ? { system } : {}),
         messages: claudeMessages,
         ...(claudeTools ? { tools: claudeTools } : {}),
-      });
+      }, { signal: params.signal });
 
       let fullText = "";
       const toolCalls: ModelToolCall[] = [];

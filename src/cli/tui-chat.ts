@@ -214,12 +214,14 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
               loader.stop();
               root.removeChild(loader);
             }
-            // Show tool call details inline
-            const argsStr = JSON.stringify(event.toolArgs ?? {});
-            const shortArgs = argsStr.length > 80 ? argsStr.slice(0, 77) + "..." : argsStr;
-            chatContainer.addChild(
-              new Text(chalk.magenta.bold("  [tool] ") + chalk.magenta(event.toolName) + chalk.dim(" " + shortArgs), 0, 0)
-            );
+            // Show tool call details inline (skip invoke_skill — already shown by ⚡ indicator)
+            if (event.toolName !== "invoke_skill") {
+              const argsStr = JSON.stringify(event.toolArgs ?? {});
+              const shortArgs = argsStr.length > 80 ? argsStr.slice(0, 77) + "..." : argsStr;
+              chatContainer.addChild(
+                new Text(chalk.magenta.bold("  [tool] ") + chalk.magenta(event.toolName) + chalk.dim(" " + shortArgs), 0, 0)
+              );
+            }
             // Show a "running..." indicator with accumulated stats
             const elapsed = ((Date.now() - roundStartTime) / 1000).toFixed(1);
             const stats = totalInputTokens > 0 ? `  ${elapsed}s | in:${totalInputTokens}` : "";
@@ -235,12 +237,14 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
               loader.stop();
               root.removeChild(loader);
             }
-            // Show tool result inline
-            const resultText = event.toolResult ?? "";
-            const shortResult = resultText.length > 200 ? resultText.slice(0, 197) + "..." : resultText;
-            chatContainer.addChild(
-              new Text(chalk.dim("    -> ") + chalk.dim(shortResult), 0, 0)
-            );
+            // Show tool result inline (skip invoke_skill — already shown by ⚡ indicator)
+            if (event.toolName !== "invoke_skill") {
+              const resultText = event.toolResult ?? "";
+              const shortResult = resultText.length > 200 ? resultText.slice(0, 197) + "..." : resultText;
+              chatContainer.addChild(
+                new Text(chalk.dim("    -> ") + chalk.dim(shortResult), 0, 0)
+              );
+            }
             // Re-add loader as "thinking..." for next round, reset streaming state
             streamingText = "";
             streamingMarkdown = null;

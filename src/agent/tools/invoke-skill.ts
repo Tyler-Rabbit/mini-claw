@@ -48,11 +48,12 @@ export function createInvokeSkillTool(
       const { resolveSkillArgs } = await import("../../skills/loader.js");
       const resolvedPrompt = resolveSkillArgs(skill.promptTemplate, skillArgs);
 
-      // Inject the resolved prompt as system instructions for the agent.
-      // The agent will follow these instructions and execute the actual work.
+      // Return the resolved prompt as instructions for the agent to follow.
+      // The TUI displays tool results to the user, so keep the visible part short;
+      // the full instructions go into the conversation history for the model.
       return {
         type: "text",
-        content: `[Skill /${skillName} activated for: ${skillArgs.join(" ")}]\n\nFollow these instructions and execute them now. Do NOT repeat the instructions back — just do the work:\n\n${resolvedPrompt}`,
+        content: resolvedPrompt,
       };
     },
   };

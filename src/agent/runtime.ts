@@ -56,6 +56,7 @@ export class AgentRuntime {
       senderId = "local",
       model,
       history,
+      signal,
     } = options;
 
     // Resolve system prompt (may be dynamic per session)
@@ -91,6 +92,16 @@ export class AgentRuntime {
     while (round < this.maxToolRounds) {
       round++;
 
+      // Check if aborted before starting a new round
+      if (signal?.aborted) {
+        onEvent?.({
+          type: "done",
+          usage: totalUsage,
+          durationMs: Date.now() - startTime,
+        });
+        return "";
+      }
+
       const response = await this.modelRouter.chat({
         messages,
         tools: tools.length > 0 ? tools : undefined,
@@ -101,6 +112,7 @@ export class AgentRuntime {
           onEvent?.({ type: "text", content: text });
         },
         system: resolvedSystemPrompt || undefined,
+        signal,
       });
 
       // Emit per-round usage so the UI can show real-time token counts
@@ -136,6 +148,16 @@ export class AgentRuntime {
       messages.push(assistantMsg);
       session.history.push(assistantMsg);
       await this.sessionManager.persist(sessionKey, assistantMsg);
+
+      // Check abort before executing tools
+      if (signal?.aborted) {
+        onEvent?.({
+          type: "done",
+          usage: totalUsage,
+          durationMs: Date.now() - startTime,
+        });
+        return "";
+      }
 
       // Execute each tool and add results
       for (const toolCall of response.toolCalls) {
@@ -190,6 +212,7 @@ export class AgentRuntime {
         onEvent?.({ type: "text", content: text });
       },
       system: resolvedSystemPrompt || undefined,
+      signal,
     });
 
     addUsage(finalResponse.usage);

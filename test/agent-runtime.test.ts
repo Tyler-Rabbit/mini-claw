@@ -216,3 +216,79 @@ describe("AgentRuntime", () => {
     expect(session!.history.length).toBeGreaterThanOrEqual(2); // user + assistant
   });
 });
+
+describe("AgentRuntime abort", () => {
+  it("should emit done with interrupted when signal is aborted before run", async () => {
+    const mockProvider = new MockProvider();
+    mockProvider.setResponses([
+      { content: "Should not reach here", toolCalls: [], stopReason: "end_turn" },
+    ]);
+
+    const router = new ModelRouter();
+    router.registerProvider(mockProvider);
+
+    const agent = new AgentRuntime({
+      modelRouter: router,
+      toolRegistry: new ToolRegistry(),
+      sessionManager: new SessionManager(),
+      defaultProvider: "mock",
+    });
+
+    const ac = new AbortController();
+    ac.abort(); // abort before calling run
+
+    const events: AgentStreamEvent[] = [];
+    await agent.run(
+      { message: "Hi", sessionKey: "test-abort-1", signal: ac.signal },
+      (e) => events.push(e)
+    );
+
+    expect(events.some((e) => e.type === "done")).toBe(true);
+    // Should not have produced any text
+    expect(events.some((e) => e.type === "text")).toBe(false);
+  });
+
+  it("should emit done with interrupted when signal aborts mid-stream", async () => {
+    const slowProvider: ModelProvider = {
+      name: "slow",
+      async chat(params) {
+        if (params.onChunk) {
+          params.onChunk("Hello ");
+          // Simulate abort after first chunk
+          if (params.signal?.aborted) {
+            return { content: "Hello ", toolCalls: [], stopReason: "end_turn" };
+          }
+          params.onChunk("world");
+        }
+        return { content: "Hello world", toolCalls: [], stopReason: "end_turn" };
+      },
+    };
+
+    const router = new ModelRouter();
+    router.registerProvider(slowProvider);
+
+    const agent = new AgentRuntime({
+      modelRouter: router,
+      toolRegistry: new ToolRegistry(),
+      sessionManager: new SessionManager(),
+      defaultProvider: "slow",
+    });
+
+    const ac = new AbortController();
+    let chunkCount = 0;
+    const events: AgentStreamEvent[] = [];
+
+    await agent.run(
+      { message: "Hi", sessionKey: "test-abort-2", signal: ac.signal },
+      (e) => {
+        events.push(e);
+        if (e.type === "text") {
+          chunkCount++;
+          if (chunkCount === 1) ac.abort(); // abort after first chunk
+        }
+      }
+    );
+
+    expect(events.some((e) => e.type === "done")).toBe(true);
+  });
+});

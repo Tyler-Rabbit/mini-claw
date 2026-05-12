@@ -21,38 +21,37 @@ export class ContextPruner {
     const currentTime = now ?? Date.now();
     const state = this.sessions.get(sessionKey);
 
-    // First call for this session: initialize state, prune all tool results
+    // First call for this session: just initialize state, nothing to prune yet
     if (!state) {
       this.sessions.set(sessionKey, {
         lastPruneTime: currentTime,
         lastMessageCount: messages.length,
       });
-      return this.pruneToolResults(messages, 0, messages.length);
+      return [...messages];
     }
 
     // TTL not expired: skip pruning
     if (currentTime - state.lastPruneTime < this.config.ttl) {
-      // Update message count to track new messages
       this.sessions.set(sessionKey, {
-        ...state,
+        lastPruneTime: state.lastPruneTime,
         lastMessageCount: messages.length,
       });
       return [...messages];
     }
 
     // TTL expired: prune tool results from previous rounds
-    const pruneUpTo = state.lastMessageCount;
+    const pruneUpTo = Math.min(state.lastMessageCount, messages.length);
     this.sessions.set(sessionKey, {
       lastPruneTime: currentTime,
       lastMessageCount: messages.length,
     });
-    return this.pruneToolResults(messages, 0, pruneUpTo);
+    return this.pruneToolResults(messages, pruneUpTo);
   }
 
-  private pruneToolResults(messages: ModelMessage[], fromIndex: number, toIndex: number): ModelMessage[] {
+  private pruneToolResults(messages: ModelMessage[], upToIndex: number): ModelMessage[] {
     return messages.map((msg, i) => {
-      // Only prune tool messages within the specified range
-      if (msg.role !== "tool" || i < fromIndex || i >= toIndex) {
+      // Only prune tool messages before the boundary
+      if (msg.role !== "tool" || i >= upToIndex) {
         return { ...msg };
       }
 

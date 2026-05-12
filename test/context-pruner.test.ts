@@ -42,7 +42,7 @@ describe("ContextPruner", () => {
   });
 
   describe("first call (no prior state)", () => {
-    it("should prune all existing tool results on first call", () => {
+    it("should initialize state without pruning on first call", () => {
       const pruner = new ContextPruner(makeConfig());
       const messages: ModelMessage[] = [
         makeUser("question"),
@@ -52,40 +52,17 @@ describe("ContextPruner", () => {
       ];
       const result = pruner.prune("session-1", messages);
 
-      // The tool result at index 2 should be hard-pruned (small content)
-      expect(result[2].content).toBe("[tool result pruned - old output]");
-      expect(result[2].role).toBe("tool");
+      // First call: no pruning, just initialize state
+      expect(result[2].content).toBe("small result");
+      expect(result).not.toBe(messages);
     });
 
-    it("should soft-trim large tool results on first call", () => {
-      const largeContent = "A".repeat(500) + "MIDDLE" + "B".repeat(500);
-      const pruner = new ContextPruner(makeConfig({ softTrimThreshold: 100, softTrimHead: 50, softTrimTail: 50 }));
-      const messages: ModelMessage[] = [
-        makeUser("question"),
-        makeAssistant("checking"),
-        makeToolResult(largeContent),
-      ];
+    it("should return a new array on first call", () => {
+      const pruner = new ContextPruner(makeConfig());
+      const messages: ModelMessage[] = [makeToolResult("result")];
       const result = pruner.prune("session-1", messages);
-
-      const pruned = result[2].content;
-      expect(pruned).toContain("A".repeat(50));
-      expect(pruned).toContain("B".repeat(50));
-      expect(pruned).toContain("...");
-      expect(pruned).toContain("pruned");
-      // Original was 1006 chars, pruned should be much shorter
-      expect(pruned.length).toBeLessThan(largeContent.length);
-    });
-
-    it("should hard-prune small tool results on first call", () => {
-      const pruner = new ContextPruner(makeConfig({ softTrimThreshold: 2000 }));
-      const messages: ModelMessage[] = [
-        makeUser("question"),
-        makeToolResult("short output"),
-        makeAssistant("answer"),
-      ];
-      const result = pruner.prune("session-1", messages);
-
-      expect(result[1].content).toBe("[tool result pruned - old output]");
+      expect(result).not.toBe(messages);
+      expect(result[0].content).toBe("result");
     });
   });
 
@@ -95,10 +72,14 @@ describe("ContextPruner", () => {
       const tail = "T".repeat(100);
       const content = head + "X".repeat(5000) + tail;
       const pruner = new ContextPruner(makeConfig({ softTrimThreshold: 200, softTrimHead: 100, softTrimTail: 100 }));
+      const now = Date.now();
       const messages: ModelMessage[] = [
         makeToolResult(content),
       ];
-      const result = pruner.prune("session-1", messages);
+      // First call: initialize
+      pruner.prune("session-1", messages, now);
+      // Second call after TTL: triggers pruning
+      const result = pruner.prune("session-1", messages, now + 6 * 60 * 1000);
 
       const pruned = result[0].content;
       expect(pruned.startsWith(head)).toBe(true);
@@ -109,10 +90,14 @@ describe("ContextPruner", () => {
     it("should report correct number of pruned chars", () => {
       const content = "A".repeat(500) + "B".repeat(500); // 1000 chars
       const pruner = new ContextPruner(makeConfig({ softTrimThreshold: 100, softTrimHead: 10, softTrimTail: 10 }));
+      const now = Date.now();
       const messages: ModelMessage[] = [
         makeToolResult(content),
       ];
-      const result = pruner.prune("session-1", messages);
+      // First call: initialize
+      pruner.prune("session-1", messages, now);
+      // Second call after TTL: triggers pruning
+      const result = pruner.prune("session-1", messages, now + 6 * 60 * 1000);
 
       expect(result[0].content).toContain("1000 chars");
     });
@@ -168,13 +153,14 @@ describe("ContextPruner", () => {
   describe("subsequent calls and TTL", () => {
     it("should not prune current round messages (index >= lastMessageCount)", () => {
       const pruner = new ContextPruner(makeConfig());
-      // First call: 3 messages
+      const now = Date.now();
+      // First call: 3 messages (initializes state, no pruning)
       const firstMessages: ModelMessage[] = [
         makeUser("q1"),
         makeAssistant("a1"),
         makeToolResult("old tool"),
       ];
-      pruner.prune("session-1", firstMessages);
+      pruner.prune("session-1", firstMessages, now);
 
       // Second call after TTL: 5 messages, last 2 are "new" (current round)
       const secondMessages: ModelMessage[] = [
@@ -186,7 +172,7 @@ describe("ContextPruner", () => {
       ];
 
       // Advance time past TTL
-      const result = pruner.prune("session-1", secondMessages, Date.now() + 6 * 60 * 1000);
+      const result = pruner.prune("session-1", secondMessages, now + 6 * 60 * 1000);
 
       // Old tool result should be pruned
       expect(result[2].content).toBe("[tool result pruned - old output]");
@@ -198,14 +184,14 @@ describe("ContextPruner", () => {
       const pruner = new ContextPruner(makeConfig({ ttl: 60_000 }));
       const now = Date.now();
 
-      // First call
+      // First call (initializes state)
       const messages: ModelMessage[] = [
         makeUser("q"),
         makeToolResult("tool output"),
       ];
       pruner.prune("session-1", messages, now);
 
-      // Second call within TTL -- should not prune even though there's old state
+      // Second call within TTL -- should not prune
       const messages2: ModelMessage[] = [
         makeUser("q"),
         makeToolResult("tool output"),
@@ -225,7 +211,7 @@ describe("ContextPruner", () => {
       const pruner = new ContextPruner(makeConfig({ ttl: 60_000 }));
       const now = Date.now();
 
-      // First call
+      // First call (initializes state)
       const messages: ModelMessage[] = [
         makeUser("q"),
         makeToolResult("tool output"),
@@ -265,9 +251,13 @@ describe("ContextPruner", () => {
 
     it("should not mutate individual message objects", () => {
       const pruner = new ContextPruner(makeConfig());
+      const now = Date.now();
       const msg = makeToolResult("tool output");
       const messages: ModelMessage[] = [msg];
-      const result = pruner.prune("session-1", messages);
+      // First call: initialize
+      pruner.prune("session-1", messages, now);
+      // Second call after TTL: triggers pruning with new objects
+      const result = pruner.prune("session-1", messages, now + 6 * 60 * 1000);
 
       expect(msg.content).toBe("tool output");
       expect(result[0]).not.toBe(msg);
@@ -277,12 +267,20 @@ describe("ContextPruner", () => {
   describe("session isolation", () => {
     it("should track state independently per session", () => {
       const pruner = new ContextPruner(makeConfig());
+      const now = Date.now();
 
-      // Call for session A
-      pruner.prune("session-A", [makeToolResult("old A")]);
+      // Initialize session A
+      pruner.prune("session-A", [makeToolResult("old A")], now);
 
-      // Call for session B -- first call, should prune
-      const resultB = pruner.prune("session-B", [makeToolResult("old B")]);
+      // Initialize session B
+      pruner.prune("session-B", [makeToolResult("old B")], now);
+
+      // After TTL, session A should prune its old messages
+      const resultA = pruner.prune("session-A", [makeToolResult("old A")], now + 6 * 60 * 1000);
+      expect(resultA[0].content).toBe("[tool result pruned - old output]");
+
+      // Session B should also prune independently
+      const resultB = pruner.prune("session-B", [makeToolResult("old B")], now + 6 * 60 * 1000);
       expect(resultB[0].content).toBe("[tool result pruned - old output]");
     });
   });
@@ -302,6 +300,30 @@ describe("ContextPruner", () => {
       ];
       const result = pruner.prune("session-1", messages);
       expect(result).toEqual(messages);
+    });
+
+    it("should clamp pruneUpTo when messages are shorter than lastMessageCount", () => {
+      const pruner = new ContextPruner(makeConfig());
+      const now = Date.now();
+
+      // First call: 5 messages
+      pruner.prune("session-1", [
+        makeUser("q1"),
+        makeToolResult("r1"),
+        makeUser("q2"),
+        makeToolResult("r2"),
+        makeUser("q3"),
+      ], now);
+
+      // Second call after TTL: only 3 messages (some were removed)
+      const result = pruner.prune("session-1", [
+        makeUser("q1"),
+        makeToolResult("r1"),
+        makeUser("q3"),
+      ], now + 6 * 60 * 1000);
+
+      // Should prune the tool result at index 1 (within clamped boundary)
+      expect(result[1].content).toBe("[tool result pruned - old output]");
     });
   });
 });

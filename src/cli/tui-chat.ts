@@ -49,6 +49,11 @@ export interface TuiChatOptions {
 export async function runTuiChat(options: TuiChatOptions): Promise<void> {
   const { agent, provider, model, sessionKey = "agent:main:dm:local", sessionManager, skillExecutor, setSkillInvokedCallback } = options;
 
+  // Pre-load session so history is available for up/down navigation on startup
+  if (sessionManager) {
+    await sessionManager.getOrCreate(sessionKey);
+  }
+
   const terminal = new ProcessTerminal();
   const tui = new TUI(terminal, true);
 

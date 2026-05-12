@@ -95,6 +95,7 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
   let abortController: AbortController | null = null;
+  let currentMessageText = "";
 
   // Register skill invocation callback for agent-driven skill calls
   if (setSkillInvokedCallback) {
@@ -151,6 +152,7 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
   async function processMessage(text: string, showAsUserMessage = true) {
     if (isBusy) return;
     isBusy = true;
+    currentMessageText = text;
 
     if (showAsUserMessage) {
       addMessage("user", text);
@@ -272,6 +274,7 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
     }
 
     abortController = null;
+    currentMessageText = "";
     streamingText = "";
     streamingMarkdown = null;
     isBusy = false;
@@ -312,7 +315,8 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
               : "  No skills available",
             "",
             "Shortcuts:",
-            "  Ctrl+C    Stop response / Clear input / exit",
+            "  Escape    Stop response (refills input)",
+            "  Ctrl+C    Clear input / exit",
             "  Ctrl+D    Exit",
             "  Enter     Send message",
           ].join("\n"));
@@ -377,12 +381,19 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
   }
 
   tui.addInputListener((data) => {
-    if (matchesKey(data, "ctrl+c")) {
-      if (isBusy) {
-        // Abort the current response
-        abortController?.abort();
+    // Escape: abort streaming and refill input
+    if (matchesKey(data, "escape")) {
+      if (isBusy && abortController) {
+        const msg = currentMessageText;
+        abortController.abort();
+        editor.setText(msg);
+        tui.requestRender();
         return { consume: true };
       }
+      return { consume: false };
+    }
+    if (matchesKey(data, "ctrl+c")) {
+      if (isBusy) return { consume: true }; // ignore while processing
       const now = Date.now();
       if (now - lastCtrlCTime < 1500) {
         // Double press — exit

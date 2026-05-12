@@ -4,6 +4,7 @@ import type { MarkdownTheme } from "@earendil-works/pi-tui";
 import type { AgentRuntime } from "../agent/runtime.js";
 import type { AgentStreamEvent } from "../agent/types.js";
 import type { SkillExecutor } from "../skills/executor.js";
+import type { SessionManager } from "../sessions/manager.js";
 import { getBannerLines } from "./banner.js";
 import { VERSION } from "./version.js";
 
@@ -40,12 +41,13 @@ export interface TuiChatOptions {
   provider: string;
   model: string;
   sessionKey?: string;
+  sessionManager?: SessionManager;
   skillExecutor?: SkillExecutor;
   setSkillInvokedCallback?: (cb: (skillName: string, args: string[]) => void) => void;
 }
 
 export async function runTuiChat(options: TuiChatOptions): Promise<void> {
-  const { agent, provider, model, sessionKey = "agent:main:dm:local", skillExecutor, setSkillInvokedCallback } = options;
+  const { agent, provider, model, sessionKey = "agent:main:dm:local", sessionManager, skillExecutor, setSkillInvokedCallback } = options;
 
   const terminal = new ProcessTerminal();
   const tui = new TUI(terminal, true);
@@ -297,7 +299,18 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
         case "/clear":
           chatContainer.clear();
           chatContainer.addChild(new Text(""));
-          addMessage("system", "Session cleared.");
+          addMessage("system", "Screen cleared.");
+          break;
+        case "/new":
+        case "/reset":
+          chatContainer.clear();
+          chatContainer.addChild(new Text(""));
+          if (sessionManager) {
+            sessionManager.clear(sessionKey);
+            addMessage("system", "New session started.");
+          } else {
+            addMessage("system", "Screen cleared (session manager not available).");
+          }
           break;
         case "/quit":
         case "/exit":
@@ -307,7 +320,8 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
         case "/help":
           addMessage("system", [
             "Commands:",
-            "  /clear    Clear conversation",
+            "  /new      Start a new session (clears history)",
+            "  /clear    Clear screen only",
             "  /model    Show model info",
             "  /skills   List available skills",
             "  /quit     Exit",

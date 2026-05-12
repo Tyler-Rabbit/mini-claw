@@ -106,6 +106,7 @@ To invoke a skill, call the invoke_skill tool with the skill name and arguments.
         agent,
         provider,
         model,
+        sessionManager,
         skillExecutor,
         setSkillInvokedCallback: (cb) => { onSkillInvoked = cb; },
       });

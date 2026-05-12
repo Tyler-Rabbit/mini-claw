@@ -346,6 +346,22 @@ body {
   cursor: not-allowed;
 }
 
+.chat-input .stop-btn {
+  background: var(--red);
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chat-input .stop-btn:hover {
+  background: #dc2626;
+}
+
 /* Scrollbar */
 .chat-list::-webkit-scrollbar {
   width: 6px;

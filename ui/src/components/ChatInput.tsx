@@ -2,10 +2,12 @@ import { useState, useRef, useEffect } from 'react'
 
 interface Props {
   onSend: (message: string) => void
+  onStop: () => void
   disabled: boolean
+  isStreaming: boolean
 }
 
-export function ChatInput({ onSend, disabled }: Props) {
+export function ChatInput({ onSend, onStop, disabled, isStreaming }: Props) {
   const [input, setInput] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -40,9 +42,15 @@ export function ChatInput({ onSend, disabled }: Props) {
         disabled={disabled}
         rows={1}
       />
-      <button onClick={handleSend} disabled={disabled || !input.trim()}>
-        Send
-      </button>
+      {isStreaming ? (
+        <button className="stop-btn" onClick={onStop}>
+          Stop
+        </button>
+      ) : (
+        <button onClick={handleSend} disabled={disabled || !input.trim()}>
+          Send
+        </button>
+      )}
     </div>
   )
 }

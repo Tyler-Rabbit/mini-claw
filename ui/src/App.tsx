@@ -8,7 +8,7 @@ const WS_URL = `ws://${window.location.hostname}:18789`
 
 export default function App() {
   const {
-    connected, connecting, connect, disconnect, sendMessage,
+    connected, connecting, connect, disconnect, sendMessage, abort,
     streamingText, isStreaming, streamingToolCalls,
   } = useGateway(WS_URL)
   const [messages, setMessages] = useState<Message[]>([])
@@ -103,7 +103,7 @@ export default function App() {
       </main>
 
       <footer className="chat-input-container">
-        <ChatInput onSend={handleSend} disabled={!connected || isStreaming} />
+        <ChatInput onSend={handleSend} onStop={abort} disabled={!connected || isStreaming} isStreaming={isStreaming} />
       </footer>
     </div>
   )

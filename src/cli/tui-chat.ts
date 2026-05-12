@@ -361,16 +361,27 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
           }
           break;
         case "/compact": {
+          if (isBusy) break;
+          isBusy = true;
           const instruction = trimmed.slice("/compact".length).trim() || undefined;
-          addMessage("system", "Compacting conversation...");
+          // Show loader like thinking state
+          const editorIdx = root.children.indexOf(editor);
+          root.children.splice(editorIdx, 0, loader);
+          loader.setMessage(chalk.dim("compacting conversation..."));
+          loader.start();
           tui.requestRender();
           try {
             await agent.compactSession(sessionKey, instruction);
+            loader.stop();
+            root.removeChild(loader);
             addMessage("system", "Conversation compacted.");
           } catch (err) {
+            loader.stop();
+            root.removeChild(loader);
             const msg = err instanceof Error ? err.message : String(err);
             addMessage("system", chalk.red("Compaction failed: " + msg));
           }
+          isBusy = false;
           break;
         }
         default:

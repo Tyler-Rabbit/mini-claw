@@ -17,6 +17,10 @@ export function getSessionsDir(): string {
   return join(getConfigDir(), "sessions");
 }
 
+export function getTuiDir(): string {
+  return join(getConfigDir(), "tui");
+}
+
 export function getWorkspaceDir(): string {
   return join(getConfigDir(), "workspace");
 }

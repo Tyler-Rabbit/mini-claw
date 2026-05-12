@@ -7,6 +7,7 @@ import type { SkillExecutor } from "../skills/executor.js";
 import type { SessionManager } from "../sessions/manager.js";
 import { getBannerLines } from "./banner.js";
 import { VERSION } from "./version.js";
+import { TuiHistoryStore } from "./history.js";
 
 const MARKDOWN_THEME: MarkdownTheme = {
   heading: (t) => chalk.bold.cyan(t),
@@ -53,6 +54,9 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
   if (sessionManager) {
     await sessionManager.getOrCreate(sessionKey);
   }
+
+  const historyStore = new TuiHistoryStore();
+  await historyStore.init();
 
   const terminal = new ProcessTerminal();
   const tui = new TUI(terminal, true);
@@ -106,12 +110,7 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
   let historyIndex = -1;
 
   function getUserHistory(): string[] {
-    if (!sessionManager) return [];
-    const session = sessionManager.get(sessionKey);
-    if (!session) return [];
-    return session.history
-      .filter((m) => m.role === "user")
-      .map((m) => m.content);
+    return historyStore.getAll();
   }
 
   // Register skill invocation callback for agent-driven skill calls
@@ -318,10 +317,9 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
           chatContainer.addChild(new Text(""));
           if (sessionManager) {
             sessionManager.clear(sessionKey);
-            addMessage("system", "New session started.");
-          } else {
-            addMessage("system", "Screen cleared (session manager not available).");
           }
+          historyStore.clear(); // fire-and-forget
+          addMessage("system", "New session started.");
           break;
         case "/quit":
         case "/exit":
@@ -393,6 +391,7 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
     }
 
     historyIndex = -1;
+    historyStore.append(trimmed);
     processMessage(trimmed);
   };
 

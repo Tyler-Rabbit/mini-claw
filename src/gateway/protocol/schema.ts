@@ -22,6 +22,10 @@ export const AgentParamsSchema = Type.Object({
   ),
 });
 
+export const AbortParamsSchema = Type.Object({
+  runId: Type.String(),
+});
+
 export const RequestFrameSchema = Type.Object({
   type: Type.Literal("req"),
   id: Type.String(),

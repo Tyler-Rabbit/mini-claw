@@ -2,6 +2,7 @@ import type { Static } from "@sinclair/typebox";
 import type {
   ConnectParamsSchema,
   AgentParamsSchema,
+  AbortParamsSchema,
   RequestFrameSchema,
   ResponseFrameSchema,
   EventFrameSchema,
@@ -10,6 +11,7 @@ import type {
 
 export type ConnectParams = Static<typeof ConnectParamsSchema>;
 export type AgentParams = Static<typeof AgentParamsSchema>;
+export type AbortParams = Static<typeof AbortParamsSchema>;
 export type RequestFrame = Static<typeof RequestFrameSchema>;
 export type ResponseFrame = Static<typeof ResponseFrameSchema>;
 export type EventFrame = Static<typeof EventFrameSchema>;

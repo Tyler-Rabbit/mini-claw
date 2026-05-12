@@ -45,6 +45,24 @@ export interface AgentRunOptions {
   signal?: AbortSignal;
 }
 
+export interface ContextPrunerConfig {
+  mode: "cache-ttl" | "off";
+  ttl: number;
+  softTrimThreshold: number;
+  softTrimHead: number;
+  softTrimTail: number;
+  hardPrunePlaceholder: string;
+}
+
+export const DEFAULT_CONTEXT_PRUNER_CONFIG: ContextPrunerConfig = {
+  mode: "cache-ttl",
+  ttl: 5 * 60 * 1000,
+  softTrimThreshold: 2000,
+  softTrimHead: 500,
+  softTrimTail: 500,
+  hardPrunePlaceholder: "[tool result pruned - old output]",
+};
+
 export interface AgentStreamEvent {
   type: "text" | "tool_use" | "tool_result" | "error" | "done" | "usage";
   content?: string;

@@ -196,18 +196,14 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
             streamingText += event.content;
             if (!streamingMarkdown) {
               stopProgressTimer();
-              loader.stop();
-              root.removeChild(loader);
+              if (root.children.includes(loader)) {
+                loader.stop();
+                root.removeChild(loader);
+              }
               streamingMarkdown = new Markdown(streamingText, 2, 0, MARKDOWN_THEME);
               chatContainer.addChild(streamingMarkdown);
               chatContainer.addChild(new Text(""));  // spacer
             } else {
-              // Remove loader if it was re-added by a tool_use event
-              if (root.children.includes(loader)) {
-                stopProgressTimer();
-                loader.stop();
-                root.removeChild(loader);
-              }
               streamingMarkdown.setText(streamingText);
             }
             tui.requestRender();
@@ -245,11 +241,9 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
             chatContainer.addChild(
               new Text(chalk.dim("    -> ") + chalk.dim(shortResult), 0, 0)
             );
-            // Re-add loader as "thinking..." for next round, reset streaming text
+            // Re-add loader as "thinking..." for next round, reset streaming state
             streamingText = "";
-            if (streamingMarkdown) {
-              streamingMarkdown.setText("");
-            }
+            streamingMarkdown = null;
             startProgressTimer();
             loader.setMessage(chalk.dim("thinking..."));
             const editorIdx = root.children.indexOf(editor);

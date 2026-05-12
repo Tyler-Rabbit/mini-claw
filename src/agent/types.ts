@@ -23,7 +23,7 @@ export interface AgentTool {
 }
 
 export interface ModelMessage {
-  role: "user" | "assistant" | "tool";
+  role: "user" | "assistant" | "tool" | "system";
   content: string;
   tool_call_id?: string;
   tool_calls?: ModelToolCall[];

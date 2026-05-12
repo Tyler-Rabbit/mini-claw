@@ -37,6 +37,7 @@ describe("ContextPruner", () => {
       ];
       const result = pruner.prune("session-1", messages);
       expect(result).toEqual(messages);
+      expect(result).not.toBe(messages);
     });
   });
 
@@ -216,6 +217,8 @@ describe("ContextPruner", () => {
       // Nothing should be pruned because TTL not expired
       expect(result[1].content).toBe("tool output");
       expect(result[3].content).toBe("new tool");
+      // Should return a new array reference
+      expect(result).not.toBe(messages2);
     });
 
     it("should prune when TTL has expired", () => {

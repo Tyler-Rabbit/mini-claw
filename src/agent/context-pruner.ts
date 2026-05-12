@@ -15,7 +15,7 @@ export class ContextPruner {
 
   prune(sessionKey: string, messages: ModelMessage[], now?: number): ModelMessage[] {
     if (this.config.mode === "off") {
-      return messages;
+      return [...messages];
     }
 
     const currentTime = now ?? Date.now();
@@ -37,7 +37,7 @@ export class ContextPruner {
         ...state,
         lastMessageCount: messages.length,
       });
-      return messages;
+      return [...messages];
     }
 
     // TTL expired: prune tool results from previous rounds

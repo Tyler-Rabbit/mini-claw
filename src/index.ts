@@ -14,6 +14,7 @@ export { ToolRegistry } from "./agent/tool-registry.js";
 export { ModelRouter, ClaudeProvider, OpenAIProvider } from "./agent/model-router.js";
 export * from "./agent/types.js";
 export { builtinTools } from "./agent/tools/index.js";
+export { createInvokeSkillTool } from "./agent/tools/invoke-skill.js";
 
 // Channels
 export { ChannelManager } from "./channels/manager.js";
@@ -30,6 +31,36 @@ export { PluginRegistry } from "./plugins/registry.js";
 export { loadPluginsFromDir } from "./plugins/loader.js";
 export { bootstrapPlugins } from "./plugins/bootstrap.js";
 export * from "./plugins/types.js";
+
+// Skills
+export { SkillRegistry } from "./skills/registry.js";
+export { SkillExecutor } from "./skills/executor.js";
+export {
+  parseFrontmatter,
+  parseSkill,
+  resolveSkillArgs,
+  loadSkillFromFile,
+  loadSkillsFromDirectory,
+  loadSkills,
+  loadSkillsWithPriority,
+  loadDirectorySkill,
+  loadSubAgents,
+  loadReferences,
+  loadScripts,
+  loadAssets,
+} from "./skills/loader.js";
+export type {
+  Skill,
+  SkillFrontmatter,
+  ResolvedSkill,
+  SkillContext,
+  SkillResult,
+  SubAgent,
+  ReferenceDoc,
+  ScriptFile,
+  AssetFile,
+} from "./skills/types.js";
+export type { SkillExecutorOptions } from "./skills/executor.js";
 
 // Config
 export { loadConfig } from "./config/config.js";

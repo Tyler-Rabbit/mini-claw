@@ -4,20 +4,25 @@ import type { MiniClawConfig } from "../config/config.js";
 import type { ModelProvider, AgentTool } from "../agent/types.js";
 import type { ChannelPlugin } from "../channels/types.js";
 import type { SearchProvider } from "../agent/search-provider.js";
+import type { Skill } from "../skills/types.js";
 import { searchProviderRegistry } from "../agent/search-provider-registry.js";
+import { getSkillSourceDirs } from "../config/paths.js";
 import { PluginRegistry } from "./registry.js";
 import { loadPluginsFromDir } from "./loader.js";
 import { loadBuiltinPlugins } from "./builtins/index.js";
+import { loadSkillsWithPriority } from "../skills/loader.js";
 
 // Package root: dist/plugins/ -> dist/ -> root
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const bundledExtDir = join(packageRoot, "extensions");
+const builtinSkillsDir = join(packageRoot, "skills");
 
 export interface BootstrapResult {
   providers: ModelProvider[];
   tools: AgentTool[];
   channels: ChannelPlugin[];
   searchProviders: SearchProvider[];
+  skills: Skill[];
   registry: PluginRegistry;
 }
 
@@ -75,11 +80,30 @@ export async function bootstrapPlugins(config: MiniClawConfig): Promise<Bootstra
     searchProviderRegistry.register(sp);
   }
 
+  // 5. Load skills from all sources with priority
+  //
+  // Priority (highest first):
+  //   1. Workspace Skills     — <cwd>/skills
+  //   2. Project Agent Skills — <cwd>/.agents/skills
+  //   3. Personal Agent Skills — ~/.agents/skills
+  //   4. Managed/Local Skills  — ~/.mini-claw/skills
+  //   5. Built-in Skills       — <package>/skills
+  //
+  const skillDirs = getSkillSourceDirs(builtinSkillsDir);
+  const fileSkills = await loadSkillsWithPriority(skillDirs);
+
+  // Merge: file skills first (already deduplicated by priority),
+  // then plugin-registered skills (only if not already present)
+  const skillIds = new Set(fileSkills.map((s) => s.id));
+  const pluginSkills = registry.getSkills().filter((s) => !skillIds.has(s.id));
+  const allSkills: Skill[] = [...fileSkills, ...pluginSkills];
+
   return {
     providers: registry.getProviders(),
     tools: registry.getTools(),
     channels: registry.getChannels(),
     searchProviders,
+    skills: allSkills,
     registry,
   };
 }

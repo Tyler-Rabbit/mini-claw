@@ -7,6 +7,7 @@ import { addPluginsCommand } from "./commands/plugins.js";
 import { addOnboardCommand } from "./commands/onboard.js";
 import { addProvidersCommand } from "./commands/providers.js";
 import { addModelsCommand } from "./commands/models.js";
+import { addSkillsCommand } from "./commands/skills.js";
 import { VERSION } from "./version.js";
 
 const program = new Command();
@@ -22,5 +23,6 @@ addModelsCommand(program);
 addGatewayCommand(program);
 addChatCommand(program);
 addPluginsCommand(program);
+addSkillsCommand(program);
 
 program.parse();

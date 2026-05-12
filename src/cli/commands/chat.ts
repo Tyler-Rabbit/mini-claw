@@ -4,11 +4,14 @@ import { AgentRuntime } from "../../agent/runtime.js";
 import { ModelRouter } from "../../agent/model-router.js";
 import { ToolRegistry } from "../../agent/tool-registry.js";
 import { builtinTools } from "../../agent/tools/index.js";
+import { createInvokeSkillTool } from "../../agent/tools/invoke-skill.js";
 import { SessionManager } from "../../sessions/manager.js";
 import { SessionStore } from "../../sessions/store.js";
 import { bootstrapPlugins } from "../../plugins/bootstrap.js";
 import { getSessionsDir, getWorkspaceDir } from "../../config/paths.js";
 import { ContextBuilder } from "../../workspace/context-builder.js";
+import { SkillRegistry } from "../../skills/registry.js";
+import { SkillExecutor } from "../../skills/executor.js";
 import { runTuiChat } from "../tui-chat.js";
 
 export function addChatCommand(program: Command): void {
@@ -24,14 +27,23 @@ export function addChatCommand(program: Command): void {
       const providerModel = config.agent.providers?.[provider]?.model;
       const model = options.model ?? (config.agent.defaultModel || providerModel || "");
 
-      // Bootstrap plugins
-      const { providers, tools: pluginTools } = await bootstrapPlugins(config);
+      // Bootstrap plugins and skills
+      const { providers, tools: pluginTools, skills } = await bootstrapPlugins(config);
 
       // Setup model router
       const modelRouter = new ModelRouter(provider);
       for (const p of providers) {
         modelRouter.registerProvider(p);
       }
+
+      // Setup skills (already loaded from bootstrap)
+      const skillRegistry = new SkillRegistry();
+      for (const skill of skills) {
+        skillRegistry.register(skill);
+      }
+
+      // Skill invocation callback (set by TUI)
+      let onSkillInvoked: ((skillName: string, args: string[]) => void) | undefined;
 
       // Setup tools
       const toolRegistry = new ToolRegistry();
@@ -47,7 +59,12 @@ export function addChatCommand(program: Command): void {
       const contextBuilder = new ContextBuilder(getWorkspaceDir());
       await contextBuilder.init();
 
-      // Setup agent
+      // Skill list for system prompt
+      const skillList = skills
+        .map((s) => `  - /${s.id}: ${s.description}${s.argumentHint ? ` (args: ${s.argumentHint})` : ""}`)
+        .join("\n");
+
+      // Setup agent with skill-aware system prompt
       const agent = new AgentRuntime({
         modelRouter,
         toolRegistry,
@@ -55,10 +72,42 @@ export function addChatCommand(program: Command): void {
         maxToolRounds: config.agent.maxToolRounds,
         defaultProvider: provider,
         defaultModel: model,
-        systemPrompt: async (sessionKey) => contextBuilder.buildSystemPrompt(sessionKey),
+        systemPrompt: async (sessionKey) => {
+          const basePrompt = await contextBuilder.buildSystemPrompt(sessionKey);
+          if (skills.length === 0) return basePrompt;
+          return `${basePrompt}
+
+## Available Skills
+
+You have access to the following skills. When a user's request matches a skill's purpose, use the invoke_skill tool to handle it with the appropriate skill.
+
+${skillList}
+
+To invoke a skill, call the invoke_skill tool with the skill name and arguments.`;
+        },
       });
 
-      // Launch TUI chat
-      await runTuiChat({ agent, provider, model });
+      // Setup skill executor
+      const skillExecutor = new SkillExecutor({
+        agentRuntime: agent,
+        skillRegistry,
+      });
+
+      // Register invoke_skill tool (needs callback set by TUI)
+      const invokeSkillTool = createInvokeSkillTool(
+        skillExecutor,
+        skillRegistry,
+        (skillName, args) => onSkillInvoked?.(skillName, args)
+      );
+      toolRegistry.register(invokeSkillTool);
+
+      // Launch TUI chat with skills support
+      await runTuiChat({
+        agent,
+        provider,
+        model,
+        skillExecutor,
+        setSkillInvokedCallback: (cb) => { onSkillInvoked = cb; },
+      });
     });
 }

@@ -3,6 +3,7 @@ import { TUI, ProcessTerminal, Container, Text, Markdown, Editor, Loader, matche
 import type { MarkdownTheme } from "@earendil-works/pi-tui";
 import type { AgentRuntime } from "../agent/runtime.js";
 import type { AgentStreamEvent } from "../agent/types.js";
+import type { SkillExecutor } from "../skills/executor.js";
 import { getBannerLines } from "./banner.js";
 import { VERSION } from "./version.js";
 
@@ -39,10 +40,12 @@ export interface TuiChatOptions {
   provider: string;
   model: string;
   sessionKey?: string;
+  skillExecutor?: SkillExecutor;
+  setSkillInvokedCallback?: (cb: (skillName: string, args: string[]) => void) => void;
 }
 
 export async function runTuiChat(options: TuiChatOptions): Promise<void> {
-  const { agent, provider, model, sessionKey = "agent:main:dm:local" } = options;
+  const { agent, provider, model, sessionKey = "agent:main:dm:local", skillExecutor, setSkillInvokedCallback } = options;
 
   const terminal = new ProcessTerminal();
   const tui = new TUI(terminal, true);
@@ -92,6 +95,17 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
 
+  // Register skill invocation callback for agent-driven skill calls
+  if (setSkillInvokedCallback) {
+    setSkillInvokedCallback((skillName, skillArgs) => {
+      chatContainer.addChild(
+        new Text(chalk.blue.bold("  ⚡ skill: ") + chalk.blue(`/${skillName}`) + chalk.dim(` ${skillArgs.join(" ")}`), 0, 0)
+      );
+      chatContainer.addChild(new Text(""));
+      tui.requestRender();
+    });
+  }
+
   function updateLoaderProgress() {
     if (!roundStartTime) return;
     const elapsed = ((Date.now() - roundStartTime) / 1000).toFixed(1);
@@ -132,12 +146,14 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
     chatContainer.addChild(new Text(""));  // spacer
   }
 
-  // --- Process a user message ---
-  async function processMessage(text: string) {
+  // --- Process a message (optionally skip showing as user message) ---
+  async function processMessage(text: string, showAsUserMessage = true) {
     if (isBusy) return;
     isBusy = true;
 
-    addMessage("user", text);
+    if (showAsUserMessage) {
+      addMessage("user", text);
+    }
     // Insert loader before editor dynamically
     const editorIdx = root.children.indexOf(editor);
     root.children.splice(editorIdx, 0, loader);
@@ -283,8 +299,14 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
             "Commands:",
             "  /clear    Clear conversation",
             "  /model    Show model info",
+            "  /skills   List available skills",
             "  /quit     Exit",
             "  /help     Show this help",
+            "",
+            "Skills (slash commands):",
+            skillExecutor
+              ? skillExecutor.getHelpText()
+              : "  No skills available",
             "",
             "Shortcuts:",
             "  Ctrl+C    Clear input / exit",
@@ -295,8 +317,39 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
         case "/model":
           addMessage("system", `Provider: ${provider}  |  Model: ${model}`);
           break;
+        case "/skills":
+          if (skillExecutor) {
+            addMessage("system", skillExecutor.getHelpText());
+          } else {
+            addMessage("system", "No skills available.");
+          }
+          break;
         default:
-          addMessage("system", chalk.yellow(`Unknown command: ${cmd}`));
+          // Check if it's a skill command
+          if (skillExecutor && skillExecutor.isSlashCommand(trimmed)) {
+            const skillId = cmd.slice(1); // Remove leading /
+            const args = trimmed.split(/\s+/).slice(1);
+            const resolved = skillExecutor.resolveSkill(skillId, args);
+            if (resolved) {
+              // Show skill invocation info
+              chatContainer.addChild(
+                new Text(chalk.blue.bold("  ⚡ ") + chalk.blue(`/${resolved.id}`) + chalk.dim(` — ${resolved.description}`), 0, 0)
+              );
+              if (args.length > 0) {
+                chatContainer.addChild(
+                  new Text(chalk.dim("     args: ") + chalk.dim(args.join(" ")), 0, 0)
+                );
+              }
+              chatContainer.addChild(new Text("")); // spacer
+              tui.requestRender();
+              // Execute the resolved prompt (don't show skill content as user message)
+              processMessage(resolved.resolvedPrompt, false);
+            } else {
+              addMessage("system", chalk.yellow(`Unknown command or skill: ${cmd}`));
+            }
+          } else {
+            addMessage("system", chalk.yellow(`Unknown command: ${cmd}`));
+          }
       }
       tui.requestRender();
       return;

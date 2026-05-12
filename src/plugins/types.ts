@@ -1,6 +1,7 @@
 import type { AgentTool, ModelProvider } from "../agent/types.js";
 import type { ChannelPlugin } from "../channels/types.js";
 import type { SearchProvider } from "../agent/search-provider.js";
+import type { Skill } from "../skills/types.js";
 
 export interface PluginManifest {
   id: string;
@@ -8,7 +9,7 @@ export interface PluginManifest {
   version: string;
   description?: string;
   builtin?: boolean;
-  type?: "provider" | "channel" | "tool" | "search";
+  type?: "provider" | "channel" | "tool" | "search" | "skill";
   providerId?: string;
 }
 
@@ -19,6 +20,7 @@ export interface PluginAPI {
   registerChannel: (channel: ChannelPlugin) => void;
   registerProvider: (provider: ModelProvider) => void;
   registerSearchProvider: (provider: SearchProvider) => void;
+  registerSkill: (skill: Skill) => void;
   logger: {
     info: (...args: unknown[]) => void;
     warn: (...args: unknown[]) => void;

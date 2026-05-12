@@ -1,6 +1,7 @@
 import type { AgentTool, ModelProvider } from "../agent/types.js";
 import type { ChannelPlugin } from "../channels/types.js";
 import type { SearchProvider } from "../agent/search-provider.js";
+import type { Skill } from "../skills/types.js";
 import type { LoadedPlugin, PluginAPI } from "./types.js";
 
 export class PluginRegistry {
@@ -9,6 +10,7 @@ export class PluginRegistry {
   private registeredChannels: ChannelPlugin[] = [];
   private registeredProviders: ModelProvider[] = [];
   private registeredSearchProviders: SearchProvider[] = [];
+  private registeredSkills: Skill[] = [];
 
   register(plugin: LoadedPlugin): void {
     this.plugins.set(plugin.manifest.id, plugin);
@@ -32,6 +34,9 @@ export class PluginRegistry {
         },
         registerSearchProvider: (provider) => {
           this.registeredSearchProviders.push(provider);
+        },
+        registerSkill: (skill) => {
+          this.registeredSkills.push(skill);
         },
         logger: {
           info: (...args) => console.log(`[plugin:${id}]`, ...args),
@@ -64,6 +69,10 @@ export class PluginRegistry {
 
   getSearchProviders(): SearchProvider[] {
     return this.registeredSearchProviders;
+  }
+
+  getSkills(): Skill[] {
+    return this.registeredSkills;
   }
 
   list(): LoadedPlugin[] {

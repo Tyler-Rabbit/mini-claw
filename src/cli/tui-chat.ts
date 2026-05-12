@@ -98,8 +98,16 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
   let totalOutputTokens = 0;
   let abortController: AbortController | null = null;
   let currentMessageText = "";
-  const messageHistory: string[] = [];
   let historyIndex = -1;
+
+  function getUserHistory(): string[] {
+    if (!sessionManager) return [];
+    const session = sessionManager.get(sessionKey);
+    if (!session) return [];
+    return session.history
+      .filter((m) => m.role === "user")
+      .map((m) => m.content);
+  }
 
   // Register skill invocation callback for agent-driven skill calls
   if (setSkillInvokedCallback) {
@@ -381,10 +389,7 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
       return;
     }
 
-    // Add to history
-    messageHistory.push(trimmed);
     historyIndex = -1;
-
     processMessage(trimmed);
   };
 
@@ -406,19 +411,21 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
   tui.addInputListener((data) => {
     // Up/Down: navigate message history
     if (matchesKey(data, "up") || matchesKey(data, "down")) {
-      if (isBusy || messageHistory.length === 0) return { consume: false };
+      if (isBusy) return { consume: false };
+      const history = getUserHistory();
+      if (history.length === 0) return { consume: false };
       const dir = matchesKey(data, "up") ? -1 : 1;
       if (dir === -1) {
         // Up: go back in history
         if (historyIndex === -1) {
-          historyIndex = messageHistory.length - 1;
+          historyIndex = history.length - 1;
         } else if (historyIndex > 0) {
           historyIndex--;
         }
       } else {
         // Down: go forward
         if (historyIndex === -1) return { consume: false };
-        if (historyIndex < messageHistory.length - 1) {
+        if (historyIndex < history.length - 1) {
           historyIndex++;
         } else {
           // Past the end — clear input
@@ -428,7 +435,7 @@ export async function runTuiChat(options: TuiChatOptions): Promise<void> {
           return { consume: true };
         }
       }
-      editor.setText(messageHistory[historyIndex]);
+      editor.setText(history[historyIndex]);
       tui.requestRender();
       return { consume: true };
     }
